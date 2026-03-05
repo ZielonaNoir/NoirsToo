@@ -24,6 +24,7 @@
     "report:dependency-drift": "node scripts/reports/dependency-drift.mjs",
     "report:release-gate": "node scripts/reports/release-gate.mjs",
     "report:all": "bun run report:standup && bun run report:weekly && bun run report:release-notes && bun run report:ops-scan && bun run report:ci-triage && bun run report:dependency-drift && bun run report:release-gate",
+    "qa:buttons": "node scripts/qa/buttons-playwright.mjs",
     "check": "bun run compile && bun run lint && bun run test",
     "postinstall": "wxt prepare"
   },
