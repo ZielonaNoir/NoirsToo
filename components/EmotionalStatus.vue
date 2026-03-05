@@ -9,17 +9,20 @@
       <div 
         class="absolute inset-0 rounded-full blur-md opacity-80"
         :class="coreClasses"
-      ></div>
+      />
       
       <!-- 内部脉冲 -->
       <div 
         class="absolute inset-2 rounded-full blur-sm opacity-90 animate-pulse-slow bg-white"
         style="mix-blend-mode: overlay;"
-      ></div>
+      />
       
       <!-- 状态图标 (Iconify) -->
       <div class="absolute inset-0 flex items-center justify-center text-white/90 z-10 transition-transform duration-500">
-        <Icon :icon="currentIcon" width="24" />
+        <Icon
+          :icon="currentIcon"
+          width="24"
+        />
       </div>
     </div>
     

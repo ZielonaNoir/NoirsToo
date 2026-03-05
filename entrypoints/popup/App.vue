@@ -26,8 +26,8 @@
       <!-- 底部：悬浮操作区 -->
       <div class="flex-none space-y-4 pb-4">
         <LevitatingButton 
-          @click="handleAction"
           :disabled="!isValid || currentStatus === 'processing'"
+          @click="handleAction"
         >
           <span v-if="currentStatus === 'processing'">Synthesizing...</span>
           <span v-else-if="currentStatus === 'success'">Harmony Restored</span>
@@ -37,7 +37,9 @@
         <!-- 隐形页脚 -->
         <div class="flex justify-between items-center px-2 opacity-30 hover:opacity-80 transition-opacity duration-500 text-[10px] tracking-widest uppercase">
           <span>DragonFill v0.1</span>
-          <button class="hover:text-mood-active transition-colors">Config</button>
+          <button class="hover:text-mood-active transition-colors">
+            Config
+          </button>
         </div>
       </div>
     </div>

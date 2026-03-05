@@ -1,18 +1,18 @@
 <template>
   <div class="relative group">
     <!-- 装饰光晕 -->
-    <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl opacity-0 group-focus-within:opacity-20 transition duration-1000 blur-lg group-focus-within:blur-xl"></div>
+    <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl opacity-0 group-focus-within:opacity-20 transition duration-1000 blur-lg group-focus-within:blur-xl" />
     
     <!-- 输入容器 -->
     <div class="relative bg-black/20 backdrop-blur-xl rounded-xl border border-white/5 transition-colors duration-300 group-focus-within:bg-black/40 group-focus-within:border-white/10">
       <textarea
         :value="modelValue"
+        class="w-full h-32 bg-transparent text-white/90 p-4 text-sm font-light leading-relaxed placeholder-white/20 resize-none outline-none custom-scrollbar"
+        placeholder="Drop raw fragments here..."
         @input="handleInput"
         @focus="$emit('focus')"
         @blur="$emit('blur')"
-        class="w-full h-32 bg-transparent text-white/90 p-4 text-sm font-light leading-relaxed placeholder-white/20 resize-none outline-none custom-scrollbar"
-        placeholder="Drop raw fragments here..."
-      ></textarea>
+      />
       
       <!-- 字符计数 / 能量指示 -->
       <div class="absolute bottom-2 right-3 text-[10px] text-white/30 tracking-widest font-mono">
