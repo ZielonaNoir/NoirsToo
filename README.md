@@ -18,3 +18,8 @@ This template should help get you started developing with Vue 3 in WXT.
 - `bun run report:standup`
 - `bun run report:weekly`
 - `bun run report:release-notes`
+- `bun run report:ops-scan`
+- `bun run report:ci-triage`
+- `bun run report:dependency-drift`
+- `bun run report:release-gate`
+- `bun run report:all`

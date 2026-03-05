@@ -19,6 +19,11 @@
     "report:standup": "node scripts/reports/standup.mjs",
     "report:weekly": "node scripts/reports/weekly-summary.mjs",
     "report:release-notes": "node scripts/reports/release-notes.mjs",
+    "report:ops-scan": "node scripts/reports/ops-scan.mjs",
+    "report:ci-triage": "node scripts/reports/ci-triage.mjs",
+    "report:dependency-drift": "node scripts/reports/dependency-drift.mjs",
+    "report:release-gate": "node scripts/reports/release-gate.mjs",
+    "report:all": "bun run report:standup && bun run report:weekly && bun run report:release-notes && bun run report:ops-scan && bun run report:ci-triage && bun run report:dependency-drift && bun run report:release-gate",
     "check": "bun run compile && bun run lint && bun run test",
     "postinstall": "wxt prepare"
   },
