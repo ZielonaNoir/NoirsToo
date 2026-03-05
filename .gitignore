@@ -26,3 +26,7 @@ superpowers/
 *.njsproj
 *.sln
 *.sw?
+
+.playwright-cli/
+
+output/playwright/
