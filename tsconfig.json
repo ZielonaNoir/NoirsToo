@@ -1,0 +1,4 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "exclude": ["superpowers", "node_modules", ".output"],
+}

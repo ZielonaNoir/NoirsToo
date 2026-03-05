@@ -1,0 +1,162 @@
+/* DragonFill - Obsidian Bio-Digital Fusion Theme */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS Custom Properties for Dynamic Theming */
+:root {
+  --noise-opacity: 0.03;
+  --rim-light-intensity: 0.05;
+  --glow-base: rgba(0, 242, 255, 0.4);
+  --glow-active: rgba(0, 242, 255, 0.9);
+}
+
+/* 全局基础样式 - 黑曜石虚空 */
+body {
+  @apply bg-obsidian-void text-gray-300;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 底层噪声纹理（模拟岩石质感） */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  opacity: var(--noise-opacity);
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.03) 2px,
+      rgba(255, 255, 255, 0.03) 4px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.03) 2px,
+      rgba(255, 255, 255, 0.03) 4px
+    );
+  pointer-events: none;
+}
+
+/* 磨砂玻璃基础类 */
+@layer components {
+  .glass-panel {
+    @apply bg-obsidian-void-lite/80 backdrop-blur-xl border border-obsidian-void-shard;
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, var(--rim-light-intensity)),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.5);
+  }
+
+  /* 晶体输入框 */
+  .crystal-input {
+    @apply glass-panel shadow-crystal-inner rounded-lg px-4 py-3;
+    @apply text-gray-300 placeholder-gray-600;
+    @apply focus:outline-none focus:shadow-dragon-glow;
+    @apply transition-all duration-300;
+  }
+
+  /* 龙息按钮基础 */
+  .dragon-btn {
+    @apply relative overflow-hidden;
+    @apply bg-obsidian-void-lite border border-dragon-breath/30;
+    @apply text-dragon-breath font-semibold uppercase tracking-widest;
+    @apply px-6 py-2 rounded-lg;
+    @apply transition-all duration-500;
+    @apply shadow-shard hover:shadow-dragon-glow;
+  }
+
+  .dragon-btn:hover {
+    @apply bg-dragon-breath-purple text-white border-dragon-breath;
+  }
+
+  /* 激活态按钮（处理中） */
+  .dragon-btn-active {
+    @apply bg-dragon-breath text-obsidian-void shadow-dragon-glow-intense;
+    animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* 成功态按钮 */
+  .dragon-btn-success {
+    @apply bg-gradient-to-r from-ember-gold to-ember-gold-emerald;
+    @apply text-white shadow-[0_0_30px_-5px_rgba(255,138,0,0.8)];
+  }
+}
+
+/* 呼吸光晕效果 */
+@layer utilities {
+  .breathing-glow {
+    animation: breathe 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* 锐利边缘高光（Rim Light） */
+  .rim-light {
+    position: relative;
+  }
+
+  .rim-light::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, var(--rim-light-intensity)),
+      transparent
+    );
+    pointer-events: none;
+  }
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-obsidian-void;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-obsidian-void-shard rounded-full;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-dragon-breath-purple;
+}
+
+/* 选择文本颜色 */
+::selection {
+  @apply bg-dragon-breath/30 text-dragon-breath;
+}
+
+/* 禁用默认焦点轮廓（使用自定义 shadow） */
+* {
+  outline: none;
+}
+
+/* 确保扩展弹窗最小尺寸 */
+html,
+body {
+  min-width: 400px;
+  min-height: 500px;
+}

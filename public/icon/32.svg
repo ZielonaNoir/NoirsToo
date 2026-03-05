@@ -1,0 +1,26 @@
+<!-- Placeholder icon - 可以后续替换为实际设计的龙形图标 -->
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-gradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#1A1D23;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0D0F12;stop-opacity:1" />
+    </radialGradient>
+    <linearGradient id="dragon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00F2FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6200EA;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="128" height="128" rx="24" fill="url(#bg-gradient)"/>
+  
+  <!-- Dragon Emblem -->
+  <path d="M64 24 L76 48 L96 42 L84 64 L104 76 L76 82 L82 104 L64 88 L46 104 L52 82 L24 76 L44 64 L32 42 L52 48 Z" 
+        fill="url(#dragon-gradient)" 
+        opacity="0.8"/>
+  
+  <!-- Core -->
+  <circle cx="64" cy="64" r="12" fill="#00F2FF" opacity="0.9"/>
+  <circle cx="64" cy="64" r="8" fill="#6200EA" opacity="0.7"/>
+  <circle cx="64" cy="64" r="4" fill="#00F2FF"/>
+</svg>

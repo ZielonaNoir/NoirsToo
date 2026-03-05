@@ -1,0 +1,48 @@
+{
+  "name": "wxt-vue-starter",
+  "description": "manifest.json description",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "compile": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --ignore-path .gitignore",
+    "lint:fix": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+    "report:standup": "node scripts/reports/standup.mjs",
+    "report:weekly": "node scripts/reports/weekly-summary.mjs",
+    "report:release-notes": "node scripts/reports/release-notes.mjs",
+    "check": "bun run compile && bun run lint && bun run test",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@iconify/vue": "^5.0.0",
+    "@stripe/stripe-js": "^8.9.0",
+    "@supabase/supabase-js": "^2.98.0",
+    "gsap": "^3.14.2",
+    "vue": "^3.5.29"
+  },
+  "devDependencies": {
+    "@rushstack/eslint-patch": "^1.15.0",
+    "@types/chrome": "^0.1.37",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "@vue/eslint-config-typescript": "^14.6.0",
+    "@wxt-dev/module-vue": "^1.0.3",
+    "eslint": "8.57.0",
+    "eslint-plugin-vue": "^9.33.0",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "vue-tsc": "^3.2.5",
+    "wxt": "^0.20.18"
+  }
+}
