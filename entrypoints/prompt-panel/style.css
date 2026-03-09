@@ -26,7 +26,9 @@ body {
   align-items: flex-start;
 }
 
-h1, h2 {
+h1,
+h2,
+h3 {
   margin: 0 0 6px;
 }
 
@@ -38,12 +40,17 @@ h2 {
   font-size: 14px;
 }
 
+h3 {
+  font-size: 12px;
+}
+
 p {
   margin: 0;
 }
 
 .actions,
-.row {
+.row,
+.provider-row {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -64,6 +71,11 @@ button {
   cursor: pointer;
 }
 
+button.active {
+  border-color: #38bdf8;
+  background: #0b1f35;
+}
+
 button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -75,12 +87,12 @@ button.danger {
 
 textarea {
   width: 100%;
-  min-height: 88px;
+  min-height: 78px;
   resize: vertical;
 }
 
 input {
-  min-width: 180px;
+  min-width: 160px;
 }
 
 .card {
@@ -97,7 +109,7 @@ input {
 }
 
 .field-list {
-  margin: 8px 0 0;
+  margin: 8px 0 10px;
   padding: 0;
   list-style: none;
   display: grid;
@@ -130,29 +142,9 @@ input {
   margin-bottom: 8px;
 }
 
-.qa-box {
-  margin-top: 10px;
-  border: 1px dashed #0ea5e9;
-  border-radius: 10px;
-  padding: 8px;
-}
-
-.qa-box h3 {
-  margin: 0 0 8px;
-  font-size: 12px;
-}
-
-.qa-row {
-  display: grid;
-  grid-template-columns: 60px 1fr;
-  gap: 8px;
-  margin-top: 6px;
-  align-items: center;
-}
-
-.qa-row label {
-  font-size: 11px;
-  color: #bae6fd;
+.warn {
+  color: #facc15;
+  margin-bottom: 8px;
 }
 
 .chips {
@@ -172,6 +164,10 @@ input {
   font-size: 11px;
 }
 
+.history-chip {
+  cursor: pointer;
+}
+
 .chip.off {
   opacity: 0.45;
 }
@@ -186,6 +182,36 @@ input {
 
 .top-gap {
   margin: 10px 0;
+}
+
+.bubble-board {
+  position: relative;
+  margin-top: 8px;
+  height: 350px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: radial-gradient(circle at 25% 25%, rgba(14, 165, 233, 0.12), rgba(15, 23, 42, 0.7) 45%, rgba(2, 6, 23, 0.9));
+  overflow: hidden;
+}
+
+.bubble {
+  position: absolute;
+  border-radius: 999px;
+  border: 1px solid #475569;
+  padding: 6px 10px;
+  font-size: 11px;
+  background: rgba(14, 165, 233, 0.14);
+  user-select: none;
+  box-shadow: 0 8px 20px rgba(2, 6, 23, 0.35);
+}
+
+.bubble.macro {
+  background: rgba(250, 204, 21, 0.16);
+  border-color: rgba(250, 204, 21, 0.4);
+}
+
+.bubble.off {
+  opacity: 0.4;
 }
 
 .atoms {
@@ -218,6 +244,40 @@ pre {
   border-radius: 10px;
   padding: 8px;
   background: #020617;
+}
+
+.qa-box {
+  margin-top: 10px;
+  border: 1px dashed #0ea5e9;
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.qa-row {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 8px;
+  margin-top: 6px;
+  align-items: center;
+}
+
+.qa-row label {
+  font-size: 11px;
+  color: #bae6fd;
+}
+
+.history,
+.eval-box {
+  margin-top: 12px;
+}
+
+.eval-list,
+.telemetry-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  display: grid;
+  gap: 4px;
 }
 
 @media (max-width: 980px) {

@@ -174,6 +174,12 @@ const runScenario = async () => {
   let snap = getSnapshot();
   capture('initial');
 
+  const heuristicRef = getRef(snap, 'Heuristic');
+  if (heuristicRef) {
+    pw(['click', heuristicRef]);
+    snap = getSnapshot();
+  }
+
   const startPickRef = getRef(snap, 'Start Pick');
   if (!startPickRef) throw new Error('Start Pick ref not found in initial snapshot.');
 
@@ -208,10 +214,11 @@ const runScenario = async () => {
   const extractRef = getRef(snap, 'Extract Tags');
   if (!extractAreaRef || !extractRef) throw new Error('Extract refs not found.');
 
-  pw(['fill', extractAreaRef, 'extract_camera_motion_cinematic_tone']);
+  pw(['fill', extractAreaRef, 'extract,camera,motion,cinematic,tone']);
   pw(['click', extractRef]);
+  await sleep(600);
   snap = getSnapshot();
-  assertIncludes('Extract creates chips', snap, 'extract_camera_motion_cinematic_tone');
+  assertIncludes('Extract creates chips', snap, 'camera');
   assertIncludes('Extract creates prompt atoms', snap, 'Prompt Atoms');
   capture('extract-tags');
 

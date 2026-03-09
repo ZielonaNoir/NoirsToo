@@ -1,19 +1,19 @@
-import type { OptimizationIteration, OptimizationRun, PromptAtom, TagNode } from '../../types/prompt-graph';
+import type {
+  LLMProviderKind,
+  PromptAtom,
+  PromptOrchestratorResult,
+  PromptRunOptions,
+  TagNode,
+  OptimizationRun,
+  OptimizationIteration,
+  EvalRun,
+  EvalRubric,
+} from '../../types/prompt-graph';
+import { Evaluator } from './evaluator';
+import { LLMGateway } from './providers/gateway';
 
-const STOP_WORDS = new Set([
-  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'into', 'have', 'will', 'about', 'your', 'you',
-  'are', 'was', 'were', 'been', 'their', 'there', 'what', 'when', 'where', 'which', 'while', 'would',
-  'should', 'could', 'can', 'to', 'of', 'in', 'on', 'a', 'an', 'is', 'it', 'as', 'by', 'or', 'be',
-]);
-
-const classifyType = (word: string): TagNode['type'] => {
-  if (/risk|error|fail|unsafe|compliance/i.test(word)) return 'risk';
-  if (/style|tone|voice|format/i.test(word)) return 'style';
-  if (/must|should|limit|constraint|rule/i.test(word)) return 'constraint';
-  if (/build|create|generate|extract|summarize|optimize/i.test(word)) return 'intent';
-  if (/formal|casual|technical|friendly/i.test(word)) return 'tone';
-  return 'entity';
-};
+const gateway = new LLMGateway();
+const evaluator = new Evaluator();
 
 const layerForType = (type: TagNode['type']): PromptAtom['layer'] => {
   if (type === 'intent') return 'task';
@@ -22,32 +22,37 @@ const layerForType = (type: TagNode['type']): PromptAtom['layer'] => {
   return 'context';
 };
 
-export const extractSmallTags = (input: string): TagNode[] => {
-  const words = input
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
-    .split(/\s+/)
-    .filter((word) => word.length >= 3 && !STOP_WORDS.has(word));
+const normalizeExtractedTags = (raw: unknown): TagNode[] => {
+  const arrayValue = Array.isArray(raw) ? raw : [];
+  return arrayValue
+    .map((item, index) => {
+      const token = item as Partial<TagNode>;
+      return {
+        id: token.id || `small-${index + 1}`,
+        level: token.level === 'macro' ? 'macro' : 'small',
+        label: String(token.label ?? '').trim(),
+        type: token.type && ['entity', 'intent', 'constraint', 'style', 'tone', 'risk'].includes(token.type)
+          ? token.type
+          : 'entity',
+        weight: typeof token.weight === 'number' ? token.weight : 0.7,
+        confidence: typeof token.confidence === 'number' ? token.confidence : 0.7,
+        sourceSpan: token.sourceSpan,
+        enabled: token.enabled ?? true,
+        children: Array.isArray(token.children) ? token.children : [],
+      } as TagNode;
+    })
+    .filter((tag) => tag.label.length > 0);
+};
 
-  const freq = new Map<string, number>();
-  words.forEach((word) => {
-    freq.set(word, (freq.get(word) || 0) + 1);
-  });
+export const extractSmallTags = async (input: string, provider: LLMProviderKind = 'openai') => {
+  const run = await gateway.generate('extract', { input }, provider);
+  const raw = run.primary.json;
 
-  return Array.from(freq.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 24)
-    .map(([word, count], index) => ({
-      id: `small-${index + 1}`,
-      level: 'small' as const,
-      label: word,
-      type: classifyType(word),
-      weight: Math.min(1, count / 4),
-      confidence: Math.min(1, 0.55 + count * 0.08),
-      enabled: true,
-      sourceSpan: word,
-      children: [],
-    }));
+  const tags = normalizeExtractedTags(raw)
+    .slice(0, 50)
+    .map((tag, index) => ({ ...tag, x: 80 + (index % 8) * 120, y: 80 + Math.floor(index / 8) * 90 }));
+
+  return { tags, run };
 };
 
 export const buildPromptAtoms = (tags: TagNode[]): PromptAtom[] => {
@@ -62,60 +67,82 @@ export const buildPromptAtoms = (tags: TagNode[]): PromptAtom[] => {
     }));
 };
 
-const tokenize = (text: string): Set<string> => {
-  return new Set(
-    text
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
-      .split(/\s+/)
-      .filter((word) => word.length >= 3 && !STOP_WORDS.has(word)),
-  );
+const scorePrompt = (candidate: string, target: string, history: EvalRun[], rubric?: EvalRubric) => {
+  const evalRun = evaluator.score(candidate, target, rubric);
+  history.push(evalRun);
+  return evalRun.overallScore;
 };
 
-const scorePrompt = (prompt: string, target: string): number => {
-  const a = tokenize(prompt);
-  const b = tokenize(target);
-  if (a.size === 0 || b.size === 0) return 0;
+export const optimizePrompt = async (
+  inputPrompt: string,
+  target: string,
+  options: PromptRunOptions = {},
+): Promise<{ optimization: OptimizationRun; evalHistory: EvalRun[]; llmRuns: PromptOrchestratorResult['llmRuns'] }> => {
+  const maxIterations = options.maxIterations ?? 3;
+  const provider = options.provider ?? 'openai';
+  const evalHistory: EvalRun[] = [];
+  const llmRuns: PromptOrchestratorResult['llmRuns'] = [];
 
-  let intersection = 0;
-  a.forEach((word) => {
-    if (b.has(word)) intersection += 1;
-  });
-
-  return intersection / new Set([...a, ...b]).size;
-};
-
-export const optimizePrompt = (inputPrompt: string, target: string, maxIterations = 3): OptimizationRun => {
   const runId = `run-${Date.now()}`;
-  const targetTerms = tokenize(target);
   const iterations: OptimizationIteration[] = [];
   let bestPrompt = inputPrompt.trim();
-  let bestScore = scorePrompt(bestPrompt, target);
+  let bestScore = scorePrompt(bestPrompt, target, evalHistory, options.rubric);
 
   for (let i = 0; i < maxIterations; i += 1) {
-    const currentTerms = tokenize(bestPrompt);
-    const missing = Array.from(targetTerms).filter((term) => !currentTerms.has(term)).slice(0, 4);
-    const candidate = missing.length > 0
-      ? `${bestPrompt}\n\nFocus additions: ${missing.join(', ')}.`
-      : `${bestPrompt}\n\nKeep output aligned with target quality constraints.`;
-    const candidateScore = scorePrompt(candidate, target);
+    const llmRun = await gateway.generate('optimize', {
+      input: inputPrompt,
+      prompt: bestPrompt,
+      target,
+      constraints: ['Preserve deterministic output format', 'Avoid hallucinated constraints'],
+    }, provider);
+
+    llmRuns.push(llmRun);
+    const candidatePrompt = String((llmRun.primary.json as any)?.prompt ?? llmRun.primary.output ?? bestPrompt).trim();
+    const candidateScore = scorePrompt(candidatePrompt, target, evalHistory, options.rubric);
 
     if (candidateScore > bestScore) {
-      bestPrompt = candidate;
+      bestPrompt = candidatePrompt;
       bestScore = candidateScore;
-      iterations.push({ index: i + 1, prompt: candidate, score: candidateScore, reason: 'Added missing target concepts.' });
+      iterations.push({ index: i + 1, prompt: candidatePrompt, score: candidateScore, reason: 'LLM optimization improved evaluated score.' });
     } else {
-      iterations.push({ index: i + 1, prompt: bestPrompt, score: bestScore, reason: 'No measurable improvement; kept previous best.' });
+      iterations.push({ index: i + 1, prompt: bestPrompt, score: bestScore, reason: 'No improvement from optimization candidate.' });
       break;
     }
   }
 
   return {
-    runId,
-    input: inputPrompt,
-    target,
-    iterations,
-    bestPrompt,
-    score: bestScore,
+    optimization: {
+      runId,
+      input: inputPrompt,
+      target,
+      iterations,
+      bestPrompt,
+      score: bestScore,
+    },
+    evalHistory,
+    llmRuns,
   };
 };
+
+export class PromptOrchestrator {
+  async run(input: string, target: string, options: PromptRunOptions = {}): Promise<PromptOrchestratorResult> {
+    const provider = options.provider ?? 'openai';
+    const { tags, run } = await extractSmallTags(input, provider);
+    const atoms = buildPromptAtoms(tags);
+    const basePrompt = [
+      'You are a prompt process engine.',
+      ...atoms.map((atom) => `[${atom.layer}] ${atom.text}`),
+      'Return output in deterministic JSON with rationale.',
+    ].join('\n');
+
+    const optimized = await optimizePrompt(basePrompt, target, options);
+
+    return {
+      smallTags: tags,
+      atoms,
+      optimization: optimized.optimization,
+      evalHistory: optimized.evalHistory,
+      llmRuns: [run, ...optimized.llmRuns],
+    };
+  }
+}

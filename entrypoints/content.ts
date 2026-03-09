@@ -1,3 +1,4 @@
+import { assessFieldRisk } from '../lib/prompt-graph/risk';
 import type { PickSession, PickedField, TargetNode } from '../types/prompt-graph';
 
 type FillMode = 'empty-only' | 'force';
@@ -25,6 +26,11 @@ export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_idle',
   main() {
+    if (window.top !== window.self) {
+      emitEvent('ERROR', { message: 'Embedded frame context detected. Picker limited to top document.' });
+      return;
+    }
+
     void browser.runtime.sendMessage({ type: 'CONTENT_READY', href: window.location.href })
       .then((response) => {
         if (response && typeof response.tabId === 'number') {
@@ -183,10 +189,23 @@ const injectDirtyData = async (mode: FillMode) => {
 
   let filled = 0;
   let skipped = 0;
+  const riskFlags = new Set<string>();
 
   const startedAt = performance.now();
 
   for (const field of runtime.selectedTarget.fields) {
+    const risk = assessFieldRisk(field);
+    risk.riskFlags.forEach((flag) => riskFlags.add(flag));
+
+    if (risk.blocked) {
+      skipped += 1;
+      emitEvent('RISK_BLOCKED', {
+        message: risk.reason,
+        selector: field.selector,
+      });
+      continue;
+    }
+
     const element = document.querySelector(field.selector) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
     if (!element) {
       skipped += 1;
@@ -211,6 +230,7 @@ const injectDirtyData = async (mode: FillMode) => {
     skipped,
     total: runtime.selectedTarget.fields.length,
     durationMs: Math.round(performance.now() - startedAt),
+    riskFlags: Array.from(riskFlags),
   });
 };
 
@@ -355,12 +375,14 @@ const getLabel = (element: Element): string | undefined => {
 };
 
 const emitEvent = (event: string, payload?: unknown) => {
+  const traceId = `trace-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const record = {
     tabId: runtime.tabId,
     sessionId: runtime.sessionId,
     event,
     state: runtime.state,
     timestamp: Date.now(),
+    traceId,
   };
   console.info('[PromptGraph:content]', record);
   void browser.runtime.sendMessage({
@@ -371,5 +393,6 @@ const emitEvent = (event: string, payload?: unknown) => {
     sessionId: runtime.sessionId,
     timestamp: Date.now(),
     state: runtime.state,
+    traceId,
   });
 };
