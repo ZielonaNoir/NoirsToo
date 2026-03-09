@@ -12,6 +12,14 @@ export default defineConfig({
       'clipboardRead',
       'scripting'
     ],
+    commands: {
+      'toggle-picker': {
+        suggested_key: {
+          default: 'Ctrl+Shift+C'
+        },
+        description: 'Toggle Prompt Graph picker mode on the active page'
+      }
+    },
     host_permissions: [
       '<all_urls>'
     ],
