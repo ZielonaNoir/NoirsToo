@@ -77,3 +77,19 @@ export interface RuntimeEventMessage {
     | 'ERROR';
   payload?: unknown;
 }
+
+export interface InjectResultPayload {
+  mode: 'empty-only' | 'force';
+  filled: number;
+  skipped: number;
+  total: number;
+  durationMs: number;
+}
+
+export interface GraphSnapshot {
+  version: number;
+  smallTags: TagNode[];
+  macroTags: TagNode[];
+  prompt: string;
+  updatedAt: number;
+}

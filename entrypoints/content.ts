@@ -10,6 +10,7 @@ interface PickerRuntime {
   tabId: number;
   sessionId: string;
   listenersAttached: boolean;
+  lastHoverEmitAt: number;
 }
 
 const runtime: PickerRuntime = {
@@ -17,6 +18,7 @@ const runtime: PickerRuntime = {
   tabId: -1,
   sessionId: '',
   listenersAttached: false,
+  lastHoverEmitAt: 0,
 };
 
 export default defineContentScript({
@@ -116,6 +118,10 @@ const handleMouseMove = (event: MouseEvent) => {
     runtime.highlight.style.height = `${rect.height}px`;
   }
 
+  const now = Date.now();
+  if (now - runtime.lastHoverEmitAt < 80) return;
+  runtime.lastHoverEmitAt = now;
+
   emitEvent('PICK_HOVER', {
     selector: getSelector(runtime.currentTarget),
     tagName: runtime.currentTarget.tagName.toLowerCase(),
@@ -178,6 +184,8 @@ const injectDirtyData = async (mode: FillMode) => {
   let filled = 0;
   let skipped = 0;
 
+  const startedAt = performance.now();
+
   for (const field of runtime.selectedTarget.fields) {
     const element = document.querySelector(field.selector) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
     if (!element) {
@@ -197,7 +205,13 @@ const injectDirtyData = async (mode: FillMode) => {
   }
 
   runtime.state = 'done';
-  emitEvent('INJECT_RESULT', { mode, filled, skipped, total: runtime.selectedTarget.fields.length });
+  emitEvent('INJECT_RESULT', {
+    mode,
+    filled,
+    skipped,
+    total: runtime.selectedTarget.fields.length,
+    durationMs: Math.round(performance.now() - startedAt),
+  });
 };
 
 const collectFields = (container: HTMLElement): PickedField[] => {
@@ -341,11 +355,21 @@ const getLabel = (element: Element): string | undefined => {
 };
 
 const emitEvent = (event: string, payload?: unknown) => {
+  const record = {
+    tabId: runtime.tabId,
+    sessionId: runtime.sessionId,
+    event,
+    state: runtime.state,
+    timestamp: Date.now(),
+  };
+  console.info('[PromptGraph:content]', record);
   void browser.runtime.sendMessage({
     type: 'PICK_EVENT',
     tabId: runtime.tabId,
     event,
     payload,
     sessionId: runtime.sessionId,
+    timestamp: Date.now(),
+    state: runtime.state,
   });
 };

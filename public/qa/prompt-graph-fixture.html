@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompt Graph QA Fixture</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 20px; }
+      .target { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; max-width: 420px; }
+      .row { display: grid; grid-template-columns: 90px 1fr; gap: 8px; margin-top: 8px; }
+      input { padding: 6px 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Prompt Graph QA Fixture</h1>
+    <div id="qa-target" class="target">
+      <div class="row"><label for="qa-email">Email</label><input id="qa-email" name="email" type="email" value="existing@example.dev"></div>
+      <div class="row"><label for="qa-name">Name</label><input id="qa-name" name="name" type="text"></div>
+      <div class="row"><label for="qa-city">City</label><input id="qa-city" name="city" type="text"></div>
+    </div>
+  </body>
+</html>

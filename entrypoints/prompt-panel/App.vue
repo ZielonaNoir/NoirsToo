@@ -42,6 +42,12 @@
       >
         {{ session.lastError }}
       </p>
+      <p
+        v-if="injectSummary"
+        class="ok"
+      >
+        {{ injectSummary }}
+      </p>
       <div v-if="session.targetNode">
         <p><strong>Selector:</strong> {{ session.targetNode.selector }}</p>
         <p><strong>XPath:</strong> {{ session.targetNode.xpath }}</p>
@@ -59,6 +65,39 @@
       <p v-else>
         No container selected.
       </p>
+      <div
+        v-if="isQaMode"
+        class="qa-box"
+      >
+        <h3>QA Fixture Controls</h3>
+        <button @click="mockSelectTarget">
+          Mock Select Target
+        </button>
+        <div class="qa-row">
+          <label>Email</label>
+          <input
+            id="qa-email"
+            v-model="qaFixture.email"
+            placeholder="email"
+          >
+        </div>
+        <div class="qa-row">
+          <label>Name</label>
+          <input
+            id="qa-name"
+            v-model="qaFixture.name"
+            placeholder="name"
+          >
+        </div>
+        <div class="qa-row">
+          <label>City</label>
+          <input
+            id="qa-city"
+            v-model="qaFixture.city"
+            placeholder="city"
+          >
+        </div>
+      </div>
     </section>
 
     <section class="grid">
@@ -181,10 +220,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
-import type { OptimizationRun, PickSession, PromptAtom, TagNode } from '../../types/prompt-graph';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import type { GraphSnapshot, InjectResultPayload, OptimizationRun, PickSession, PromptAtom, TagNode } from '../../types/prompt-graph';
 
-const inspectedTabId = Number(browser.devtools?.inspectedWindow?.tabId ?? 0);
+type RuntimeMessage = Record<string, unknown>;
+type RuntimeListener = (message: RuntimeMessage) => void;
+
+type RuntimeBridge = {
+  sendMessage: (message: RuntimeMessage) => Promise<any>;
+  addListener: (listener: RuntimeListener) => void;
+  removeListener: (listener: RuntimeListener) => void;
+};
+
+const isQaMode = new URLSearchParams(window.location.search).get('qa') === '1';
+const extensionTabId = Number((window as any).browser?.devtools?.inspectedWindow?.tabId ?? 0);
+const inspectedTabId = extensionTabId || 999;
 
 const session = reactive<PickSession>({
   sessionId: '',
@@ -193,6 +243,13 @@ const session = reactive<PickSession>({
   updatedAt: Date.now(),
 });
 
+const qaFixture = reactive({
+  email: 'already@filled.dev',
+  name: '',
+  city: '',
+});
+
+const injectSummary = ref('');
 const rawInput = ref('');
 const macroName = ref('');
 const smallTags = ref<TagNode[]>([]);
@@ -204,6 +261,169 @@ const optimizationRun = ref<OptimizationRun | null>(null);
 
 const selectedSmallTagIds = computed(() => smallTags.value.filter((tag) => tag.enabled).map((tag) => tag.id));
 const canInject = computed(() => inspectedTabId > 0 && !!session.targetNode && (session.state === 'selected' || session.state === 'done'));
+
+const createQaBridge = (): RuntimeBridge => {
+  const listeners = new Set<RuntimeListener>();
+  const qaStore: GraphSnapshot = {
+    version: 1,
+    smallTags: [],
+    macroTags: [],
+    prompt: '',
+    updatedAt: Date.now(),
+  };
+
+  const notify = (event: string, payload?: unknown) => {
+    const message = {
+      type: 'PANEL_EVENT',
+      tabId: inspectedTabId,
+      event,
+      payload: {
+        ...(payload && typeof payload === 'object' ? payload as Record<string, unknown> : { value: payload }),
+        timestamp: Date.now(),
+      },
+      session: { ...session, updatedAt: Date.now() },
+    };
+    listeners.forEach((listener) => listener(message));
+  };
+
+  return {
+    async sendMessage(message: RuntimeMessage) {
+      const type = String(message.type ?? '');
+
+      if (type === 'PANEL_GET_STATE') {
+        return { ok: true, session: { ...session } };
+      }
+
+      if (type === 'PANEL_PICK_START') {
+        session.state = 'picking';
+        notify('PICK_START', { source: 'qa-bridge' });
+        notify('PICK_HOVER', { selector: '#qa-target', width: 320, height: 180 });
+        return { ok: true };
+      }
+
+      if (type === 'PANEL_PICK_STOP') {
+        session.state = 'idle';
+        notify('PICK_STOP', { source: 'qa-bridge' });
+        return { ok: true };
+      }
+
+      if (type === 'PANEL_INJECT') {
+        if (!session.targetNode) return { ok: false, error: 'No selected target' };
+        const mode = String(message.mode ?? 'empty-only') === 'force' ? 'force' : 'empty-only';
+        const startedAt = performance.now();
+
+        let filled = 0;
+        let skipped = 0;
+
+        if (mode === 'force' || qaFixture.email.length === 0) {
+          qaFixture.email = 'chaos@example.com';
+          filled += 1;
+        } else {
+          skipped += 1;
+        }
+
+        if (mode === 'force' || qaFixture.name.length === 0) {
+          qaFixture.name = 'Dragon Operator';
+          filled += 1;
+        } else {
+          skipped += 1;
+        }
+
+        if (mode === 'force' || qaFixture.city.length === 0) {
+          qaFixture.city = 'Neon Harbor';
+          filled += 1;
+        } else {
+          skipped += 1;
+        }
+
+        session.state = 'done';
+        notify('INJECT_RESULT', {
+          mode,
+          filled,
+          skipped,
+          total: 3,
+          durationMs: Math.round(performance.now() - startedAt),
+        } satisfies InjectResultPayload);
+
+        return { ok: true };
+      }
+
+      if (type === 'PANEL_EXTRACT_TAGS') {
+        const text = String(message.input ?? '');
+        const tokens = text
+          .toLowerCase()
+          .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+          .split(/\s+/)
+          .filter((word) => word.length > 2)
+          .slice(0, 12);
+
+        const tags: TagNode[] = tokens.map((token, index) => ({
+          id: `small-${index + 1}`,
+          level: 'small',
+          label: token,
+          type: index % 2 === 0 ? 'entity' : 'intent',
+          weight: 0.8,
+          confidence: 0.8,
+          enabled: true,
+          children: [],
+        }));
+
+        return { ok: true, smallTags: tags, atoms: [] };
+      }
+
+      if (type === 'PANEL_OPTIMIZE_PROMPT') {
+        const prompt = String(message.prompt ?? '');
+        const target = String(message.target ?? '');
+        const bestPrompt = `${prompt}\n\nTarget alignment: ${target.slice(0, 80)}`;
+        return {
+          ok: true,
+          run: {
+            runId: `qa-${Date.now()}`,
+            input: prompt,
+            target,
+            iterations: [{ index: 1, prompt: bestPrompt, score: 0.7, reason: 'QA optimized' }],
+            bestPrompt,
+            score: 0.7,
+          },
+        };
+      }
+
+      if (type === 'PANEL_SAVE_GRAPH') {
+        qaStore.version = 1;
+        qaStore.smallTags = (message.smallTags as TagNode[]) ?? [];
+        qaStore.macroTags = (message.macroTags as TagNode[]) ?? [];
+        qaStore.prompt = String(message.prompt ?? '');
+        qaStore.updatedAt = Date.now();
+        return { ok: true, key: `prompt-graph:${inspectedTabId}` };
+      }
+
+      if (type === 'PANEL_LOAD_GRAPH') {
+        return { ok: true, graph: { ...qaStore } };
+      }
+
+      return { ok: false, error: `Unsupported message type: ${type}` };
+    },
+    addListener(listener: RuntimeListener) {
+      listeners.add(listener);
+    },
+    removeListener(listener: RuntimeListener) {
+      listeners.delete(listener);
+    },
+  };
+};
+
+const bridge: RuntimeBridge = (() => {
+  const runtime = (window as any).browser?.runtime;
+  if (!isQaMode && runtime?.sendMessage && runtime?.onMessage) {
+    return {
+      sendMessage: (message) => runtime.sendMessage(message),
+      addListener: (listener) => runtime.onMessage.addListener(listener),
+      removeListener: (listener) => runtime.onMessage.removeListener(listener),
+    };
+  }
+
+  return createQaBridge();
+})();
 
 const rebuildAtoms = () => {
   const tagIndex = new Map<string, TagNode>();
@@ -252,19 +472,36 @@ const rebuildAtoms = () => {
 watch([smallTags, macroTags], rebuildAtoms, { deep: true });
 
 const startPick = async () => {
-  await browser.runtime.sendMessage({ type: 'PANEL_PICK_START', tabId: inspectedTabId });
+  await bridge.sendMessage({ type: 'PANEL_PICK_START', tabId: inspectedTabId });
 };
 
 const stopPick = async () => {
-  await browser.runtime.sendMessage({ type: 'PANEL_PICK_STOP', tabId: inspectedTabId });
+  await bridge.sendMessage({ type: 'PANEL_PICK_STOP', tabId: inspectedTabId });
+};
+
+const mockSelectTarget = () => {
+  if (!isQaMode) return;
+  session.targetNode = {
+    selector: '#qa-target',
+    xpath: '/html/body/div[1]',
+    domPath: ['html', 'body', 'div'],
+    boundingBox: { x: 12, y: 12, width: 320, height: 180 },
+    tagName: 'div',
+    fields: [
+      { selector: '#qa-email', type: 'email', label: 'Email' },
+      { selector: '#qa-name', type: 'text', label: 'Name' },
+      { selector: '#qa-city', type: 'text', label: 'City' },
+    ],
+  };
+  session.state = 'selected';
 };
 
 const inject = async (mode: 'empty-only' | 'force') => {
-  await browser.runtime.sendMessage({ type: 'PANEL_INJECT', tabId: inspectedTabId, mode });
+  await bridge.sendMessage({ type: 'PANEL_INJECT', tabId: inspectedTabId, mode });
 };
 
 const extractTags = async () => {
-  const response = await browser.runtime.sendMessage({
+  const response = await bridge.sendMessage({
     type: 'PANEL_EXTRACT_TAGS',
     input: rawInput.value,
   });
@@ -296,7 +533,7 @@ const createMacroTag = () => {
 };
 
 const runOptimize = async () => {
-  const response = await browser.runtime.sendMessage({
+  const response = await bridge.sendMessage({
     type: 'PANEL_OPTIMIZE_PROMPT',
     prompt: basePrompt.value,
     target: targetOutput.value,
@@ -309,7 +546,7 @@ const runOptimize = async () => {
 };
 
 const saveGraph = async () => {
-  await browser.runtime.sendMessage({
+  await bridge.sendMessage({
     type: 'PANEL_SAVE_GRAPH',
     tabId: inspectedTabId,
     smallTags: smallTags.value,
@@ -319,7 +556,7 @@ const saveGraph = async () => {
 };
 
 const loadGraph = async () => {
-  const response = await browser.runtime.sendMessage({ type: 'PANEL_LOAD_GRAPH', tabId: inspectedTabId });
+  const response = await bridge.sendMessage({ type: 'PANEL_LOAD_GRAPH', tabId: inspectedTabId });
   if (!response?.ok || !response.graph) return;
   smallTags.value = response.graph.smallTags || [];
   macroTags.value = response.graph.macroTags || [];
@@ -327,22 +564,33 @@ const loadGraph = async () => {
   rebuildAtoms();
 };
 
+const panelEventListener: RuntimeListener = (message) => {
+  if (!message || message.type !== 'PANEL_EVENT' || Number(message.tabId) !== inspectedTabId) return;
+  if (message.session) Object.assign(session, message.session as Partial<PickSession>);
+
+  if (message.event === 'INJECT_RESULT' && message.payload) {
+    const payload = message.payload as InjectResultPayload;
+    injectSummary.value = `Injected ${payload.filled}/${payload.total}, skipped ${payload.skipped}, ${payload.durationMs}ms`;
+  }
+
+  if (message.event === 'ERROR' && message.payload) {
+    session.lastError = String((message.payload as { message?: string }).message ?? 'Unknown error');
+  }
+};
+
 onMounted(async () => {
-  const state = await browser.runtime.sendMessage({ type: 'PANEL_GET_STATE', tabId: inspectedTabId });
+  const state = await bridge.sendMessage({ type: 'PANEL_GET_STATE', tabId: inspectedTabId });
   if (state?.ok && state.session) Object.assign(session, state.session);
 
-  browser.runtime.onMessage.addListener((message) => {
-    if (!message || message.type !== 'PANEL_EVENT' || Number(message.tabId) !== inspectedTabId) return;
-    if (message.session) Object.assign(session, message.session);
+  bridge.removeListener(panelEventListener);
+  bridge.addListener(panelEventListener);
 
-    if (message.event === 'INJECT_RESULT' && message.payload) {
-      const payload = message.payload as { filled: number; skipped: number; total: number };
-      session.lastError = `Injected ${payload.filled}/${payload.total}, skipped ${payload.skipped}`;
-    }
+  if (isQaMode) {
+    mockSelectTarget();
+  }
+});
 
-    if (message.event === 'ERROR' && message.payload) {
-      session.lastError = String((message.payload as { message?: string }).message ?? 'Unknown error');
-    }
-  });
+onUnmounted(() => {
+  bridge.removeListener(panelEventListener);
 });
 </script>

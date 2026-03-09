@@ -1,5 +1,5 @@
 import { buildPromptAtoms, extractSmallTags, optimizePrompt } from '../lib/prompt-graph/engine';
-import type { PickSession, RuntimeEventMessage, TagNode } from '../types/prompt-graph';
+import type { GraphSnapshot, PickSession, RuntimeEventMessage, TagNode } from '../types/prompt-graph';
 
 type FillMode = 'empty-only' | 'force';
 
@@ -8,6 +8,18 @@ interface SessionStore {
 }
 
 const sessions: SessionStore = {};
+const GRAPH_SNAPSHOT_VERSION = 1;
+
+const log = (event: string, tabId: number, sessionId?: string, state?: PickSession['state'], payload?: unknown) => {
+  console.info('[PromptGraph:background]', {
+    event,
+    tabId,
+    sessionId,
+    state,
+    timestamp: Date.now(),
+    payload,
+  });
+};
 
 const createSession = (tabId: number): PickSession => {
   const existing = sessions[tabId];
@@ -30,12 +42,17 @@ const updateSession = (tabId: number, patch: Partial<PickSession>) => {
 };
 
 const broadcastPanelEvent = async (tabId: number, event: string, payload?: unknown) => {
+  const session = sessions[tabId];
+  log(event, tabId, session?.sessionId, session?.state, payload);
   await browser.runtime.sendMessage({
     type: 'PANEL_EVENT',
     tabId,
     event,
-    payload,
-    session: sessions[tabId],
+    payload: {
+      ...(payload && typeof payload === 'object' ? payload as Record<string, unknown> : { value: payload }),
+      timestamp: Date.now(),
+    },
+    session,
   }).catch(() => {
     // Ignore if no panel listeners are attached.
   });
@@ -44,6 +61,7 @@ const broadcastPanelEvent = async (tabId: number, event: string, payload?: unkno
 const sendToTab = async (tabId: number, message: Record<string, unknown>) => {
   await browser.tabs.sendMessage(tabId, message).catch((error) => {
     updateSession(tabId, { state: 'error', lastError: String(error) });
+    log('TAB_MESSAGE_ERROR', tabId, sessions[tabId]?.sessionId, sessions[tabId]?.state, { message: String(error) });
   });
 };
 
@@ -101,6 +119,13 @@ export default defineBackground(() => {
       if (eventMessage.event === 'INJECT_RESULT') updateSession(tabId, { state: 'done' });
       if (eventMessage.event === 'ERROR') updateSession(tabId, { state: 'error', lastError: String((eventMessage.payload as any)?.message ?? 'Unknown error') });
 
+      log(
+        eventMessage.event,
+        tabId,
+        eventMessage.sessionId ?? sessions[tabId]?.sessionId,
+        sessions[tabId]?.state,
+        eventMessage.payload,
+      );
       void broadcastPanelEvent(tabId, eventMessage.event, eventMessage.payload);
       return undefined;
     }
@@ -147,7 +172,8 @@ export default defineBackground(() => {
 
     if (message.type === 'PANEL_SAVE_GRAPH') {
       const tabId = Number(message.tabId ?? 0);
-      const graph = {
+      const graph: GraphSnapshot = {
+        version: GRAPH_SNAPSHOT_VERSION,
         smallTags: Array.isArray(message.smallTags) ? (message.smallTags as TagNode[]) : [],
         macroTags: Array.isArray(message.macroTags) ? (message.macroTags as TagNode[]) : [],
         prompt: String(message.prompt ?? ''),
@@ -160,7 +186,20 @@ export default defineBackground(() => {
     if (message.type === 'PANEL_LOAD_GRAPH') {
       const tabId = Number(message.tabId ?? 0);
       const key = tabId ? `prompt-graph:${tabId}` : 'prompt-graph:global';
-      return browser.storage.local.get(key).then((result) => ({ ok: true, graph: result[key] ?? null }));
+      return browser.storage.local.get(key).then((result) => {
+        const graph = result[key] as GraphSnapshot | undefined;
+        if (!graph) return { ok: true, graph: null };
+        return {
+          ok: true,
+          graph: {
+            version: graph.version ?? 0,
+            smallTags: graph.smallTags ?? [],
+            macroTags: graph.macroTags ?? [],
+            prompt: graph.prompt ?? '',
+            updatedAt: graph.updatedAt ?? Date.now(),
+          } as GraphSnapshot,
+        };
+      });
     }
 
     return undefined;

@@ -125,6 +125,36 @@ input {
   margin-bottom: 8px;
 }
 
+.ok {
+  color: #86efac;
+  margin-bottom: 8px;
+}
+
+.qa-box {
+  margin-top: 10px;
+  border: 1px dashed #0ea5e9;
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.qa-box h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.qa-row {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 8px;
+  margin-top: 6px;
+  align-items: center;
+}
+
+.qa-row label {
+  font-size: 11px;
+  color: #bae6fd;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
