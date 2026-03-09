@@ -1,4 +1,4 @@
-import { assessFieldRisk } from '../lib/prompt-graph/risk';
+import { assessDomainRisk, assessFieldRisk } from '../lib/prompt-graph/risk';
 import type { PickSession, PickedField, TargetNode } from '../types/prompt-graph';
 
 type FillMode = 'empty-only' | 'force';
@@ -12,6 +12,7 @@ interface PickerRuntime {
   sessionId: string;
   listenersAttached: boolean;
   lastHoverEmitAt: number;
+  domainRiskFlags: string[];
 }
 
 const runtime: PickerRuntime = {
@@ -20,14 +21,41 @@ const runtime: PickerRuntime = {
   sessionId: '',
   listenersAttached: false,
   lastHoverEmitAt: 0,
+  domainRiskFlags: [],
+};
+
+const parseDomainList = (input?: string) => (input ?? '')
+  .split(',')
+  .map((item) => item.trim().toLowerCase())
+  .filter(Boolean);
+
+const allowedDomains = parseDomainList(import.meta.env.VITE_PROMPT_GRAPH_ALLOWED_DOMAINS);
+const blockedDomains = parseDomainList(import.meta.env.VITE_PROMPT_GRAPH_BLOCKED_DOMAINS);
+
+const resolveHostname = () => {
+  if (typeof window === 'undefined') return '';
+  return window.location.hostname.toLowerCase();
 };
 
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_idle',
   main() {
+    const hostname = resolveHostname();
+    const domainIsAllowed = allowedDomains.length === 0 || allowedDomains.some((pattern) => hostname.includes(pattern));
+    const domainIsBlocked = blockedDomains.some((pattern) => hostname.includes(pattern));
+
     if (window.top !== window.self) {
-      emitEvent('ERROR', { message: 'Embedded frame context detected. Picker limited to top document.' });
+      emitEvent('RISK_BLOCKED', { message: 'Embedded frame context detected. Picker limited to top document.' });
+      return;
+    }
+
+    if (domainIsBlocked) {
+      emitEvent('RISK_BLOCKED', { message: 'Current domain is blocked by policy.', host: hostname });
+      return;
+    }
+    if (!domainIsAllowed) {
+      emitEvent('RISK_BLOCKED', { message: 'Current domain is not in allow-list.', host: hostname });
       return;
     }
 
@@ -62,6 +90,15 @@ export default defineContentScript({
 const startPicker = (sessionId: string) => {
   runtime.sessionId = sessionId;
   runtime.state = 'picking';
+  const domainRisk = assessDomainRisk(window.location.href);
+  runtime.domainRiskFlags = domainRisk.riskFlags;
+
+  if (domainRisk.riskFlags.length > 0) {
+    emitEvent('RISK_BLOCKED', {
+      message: domainRisk.reason ?? 'Domain risk detected',
+      riskFlags: domainRisk.riskFlags,
+    });
+  }
 
   if (!runtime.highlight) {
     const highlight = document.createElement('div');
@@ -189,7 +226,7 @@ const injectDirtyData = async (mode: FillMode) => {
 
   let filled = 0;
   let skipped = 0;
-  const riskFlags = new Set<string>();
+  const riskFlags = new Set<string>(runtime.domainRiskFlags);
 
   const startedAt = performance.now();
 

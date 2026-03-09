@@ -336,6 +336,21 @@
     </section>
 
     <section class="card">
+      <h2>Run Diagnostics</h2>
+      <p class="muted">
+        request={{ diagnostics.requests }} · fallback={{ diagnostics.fallbacks }} · blocked={{ diagnostics.riskBlocks }} · avg latency={{ diagnostics.avgLatencyMs }}ms
+      </p>
+      <ul class="telemetry-list">
+        <li
+          v-for="item in llmDiagnostics.slice(-8).reverse()"
+          :key="item.id"
+        >
+          {{ item.time }} · {{ item.provider }} · {{ item.task }} · {{ item.status }}
+        </li>
+      </ul>
+    </section>
+
+    <section class="card">
       <h2>Telemetry</h2>
       <ul class="telemetry-list">
         <li
@@ -400,6 +415,13 @@ const qaFixture = reactive({
 const injectSummary = ref('');
 const riskSummary = ref('');
 const telemetry = ref<Array<{ id: string; event: string; timestamp: string; state: string }>>([]);
+const llmDiagnostics = ref<Array<{ id: string; time: string; provider: string; task: string; status: string; latencyMs: number }>>([]);
+const diagnostics = reactive({
+  requests: 0,
+  fallbacks: 0,
+  riskBlocks: 0,
+  avgLatencyMs: 0,
+});
 
 const rawInput = ref('');
 const macroName = ref('');
@@ -1005,10 +1027,35 @@ const panelEventListener: RuntimeListener = (message) => {
 
   if (message.event === 'RISK_BLOCKED' && message.payload) {
     riskSummary.value = String((message.payload as { message?: string }).message ?? 'Risk policy blocked a field fill.');
+    diagnostics.riskBlocks += 1;
   }
 
   if (message.event === 'ERROR' && message.payload) {
     session.lastError = String((message.payload as { message?: string }).message ?? 'Unknown error');
+  }
+
+  if (message.event === 'LLM_REQUEST') {
+    diagnostics.requests += 1;
+  }
+
+  if (message.event === 'LLM_RESULT' && message.payload && typeof message.payload === 'object') {
+    const payload = message.payload as { provider?: string; taskType?: string; fallbackUsed?: boolean; latencyMs?: number };
+    if (payload.fallbackUsed) diagnostics.fallbacks += 1;
+    const latency = Number(payload.latencyMs ?? 0);
+    if (latency > 0) {
+      const count = llmDiagnostics.value.length + 1;
+      diagnostics.avgLatencyMs = Math.round(((diagnostics.avgLatencyMs * (count - 1)) + latency) / count);
+    }
+
+    llmDiagnostics.value.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      time: new Date().toISOString(),
+      provider: payload.provider ?? 'unknown',
+      task: payload.taskType ?? 'unknown',
+      status: payload.fallbackUsed ? 'fallback' : 'ok',
+      latencyMs: latency,
+    });
+    if (llmDiagnostics.value.length > 200) llmDiagnostics.value.shift();
   }
 };
 

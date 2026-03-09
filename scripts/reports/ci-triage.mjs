@@ -22,17 +22,21 @@ const rootCauseFromStep = (stepName = '') => {
 if (!ghStatus.authenticated) {
   lines.push(`- ${ghStatus.reason}`);
   lines.push('- Unable to summarize CI failures without GitHub API access.');
-} else {
-  const runs = getRecentWorkflowRuns(15);
+  } else {
+    const runs = getRecentWorkflowRuns(15);
   if (runs.length === 0) {
     lines.push('- No workflow runs found.');
   } else {
     const failedRuns = runs.filter((run) => run.status === 'completed' && run.conclusion !== 'success');
     const flakyRuns = runs.filter((run) => (run.run_attempt ?? 1) > 1);
+    const failureRate = runs.length === 0 ? 0 : Number(((failedRuns.length / runs.length) * 100).toFixed(1));
+    const flakeRate = runs.length === 0 ? 0 : Number(((flakyRuns.length / runs.length) * 100).toFixed(1));
 
     lines.push('## Window');
     lines.push(`- Latest run: ${runs[0].name} #${runs[0].run_number} (${runs[0].status}/${runs[0].conclusion ?? 'n/a'})`);
     lines.push(`- Runs analyzed: ${runs.length}`);
+    lines.push(`- Failure rate: ${failureRate}%`);
+    lines.push(`- Retry/flaky signal rate: ${flakeRate}%`);
 
     lines.push('');
     lines.push('## Failures Grouped by Likely Root Cause');
@@ -84,6 +88,10 @@ if (!ghStatus.authenticated) {
     lines.push('- Stabilize tests with deterministic fixtures/mocks for intermittent failures.');
     lines.push('- Keep CI steps aligned with local `bun run check` to reduce environment drift.');
     lines.push('- Add failure annotations for lint/test/typecheck step names to improve grouping precision.');
+    if (failureRate > 20 || flakeRate > 20) {
+      lines.push('- Route nightly alert to Slack on repeated failures (>20% window).');
+      lines.push('- Auto-open triage issue for the dominant root cause to prevent silent regressions.');
+    }
   }
 }
 

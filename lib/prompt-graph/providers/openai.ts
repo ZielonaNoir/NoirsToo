@@ -62,6 +62,7 @@ export class OpenAIAdapter implements LLMProvider {
       json: parsed,
       tokensIn: json?.usage?.prompt_tokens,
       tokensOut: json?.usage?.completion_tokens,
+      costUsd: Number((((json?.usage?.prompt_tokens ?? 0) + (json?.usage?.completion_tokens ?? 0)) * 0.0000012).toFixed(6)),
       latencyMs: Math.round(performance.now() - startedAt),
       traceId,
     };

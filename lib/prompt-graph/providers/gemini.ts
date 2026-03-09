@@ -57,6 +57,9 @@ export class GeminiAdapter implements LLMProvider {
       taskType,
       output,
       json: parsed,
+      tokensIn: json?.usageMetadata?.promptTokenCount,
+      tokensOut: json?.usageMetadata?.candidatesTokenCount,
+      costUsd: Number(((((json?.usageMetadata?.promptTokenCount ?? 0) + (json?.usageMetadata?.candidatesTokenCount ?? 0)) * 0.000001).toFixed(6))),
       latencyMs: Math.round(performance.now() - startedAt),
       traceId,
     };

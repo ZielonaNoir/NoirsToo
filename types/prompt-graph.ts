@@ -81,6 +81,7 @@ export type RuntimeEventType =
   | 'EVAL_RUN'
   | 'EVAL_RESULT'
   | 'RISK_BLOCKED'
+  | 'AUDIT_LOGGED'
   | 'ERROR';
 
 export interface RuntimeEventMessage {
@@ -130,11 +131,15 @@ export interface ProviderResult {
   taskType: LLMTaskType;
   output: string;
   json?: unknown;
+  error?: string;
+  recoverable?: boolean;
   tokensIn?: number;
   tokensOut?: number;
+  costUsd?: number;
   latencyMs: number;
   traceId: string;
   fallbackUsed?: boolean;
+  attempt?: number;
 }
 
 export interface LLMRun {
@@ -144,6 +149,7 @@ export interface LLMRun {
   completedAt: number;
   primary: ProviderResult;
   fallback?: ProviderResult;
+  attempts?: number;
 }
 
 export interface EvalRubric {
@@ -177,6 +183,8 @@ export interface PromptRunOptions {
   maxIterations?: number;
   provider?: LLMProviderKind;
   rubric?: EvalRubric;
+  sessionId?: string;
+  tabId?: number;
 }
 
 export interface PromptOrchestratorResult {
@@ -185,4 +193,61 @@ export interface PromptOrchestratorResult {
   optimization: OptimizationRun;
   evalHistory: EvalRun[];
   llmRuns: LLMRun[];
+}
+
+export interface LLMBudgetSnapshot {
+  minuteWindowKey: string;
+  requests: number;
+  maxRequestsPerMinute: number;
+  estimatedCostUsd: number;
+  maxCostUsdPerMinute: number;
+  blocked: boolean;
+}
+
+export type AuditEventType =
+  | 'pick_start'
+  | 'pick_select'
+  | 'inject_request'
+  | 'inject_result'
+  | 'llm_request'
+  | 'llm_result'
+  | 'eval_result'
+  | 'risk_blocked'
+  | 'error';
+
+export interface AuditLogEvent {
+  eventType: AuditEventType;
+  tabId?: number;
+  sessionId?: string;
+  traceId?: string;
+  state?: PickState;
+  provider?: LLMProviderKind;
+  latencyMs?: number;
+  costUsd?: number;
+  payload?: Record<string, unknown>;
+  riskFlags?: string[];
+  createdAt: number;
+}
+
+export interface PromptDatasetItem {
+  id?: string;
+  dataset: string;
+  input: string;
+  target: string;
+  rubric?: EvalRubric;
+  version: string;
+  createdAt?: string;
+}
+
+export interface PromptEvalRecord {
+  id?: string;
+  runId: string;
+  dataset: string;
+  provider: LLMProviderKind;
+  prompt: string;
+  score: number;
+  traceId: string;
+  tabId?: number;
+  sessionId?: string;
+  createdAt?: string;
 }

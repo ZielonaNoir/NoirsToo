@@ -10,7 +10,9 @@ import type {
   EvalRubric,
 } from '../../types/prompt-graph';
 import { Evaluator } from './evaluator';
+import { persistEvalRun } from './eval-store';
 import { LLMGateway } from './providers/gateway';
+import { logAuditEvent, maskSensitiveText } from './telemetry';
 
 const gateway = new LLMGateway();
 const evaluator = new Evaluator();
@@ -42,6 +44,12 @@ const normalizeExtractedTags = (raw: unknown): TagNode[] => {
       } as TagNode;
     })
     .filter((tag) => tag.label.length > 0);
+};
+
+const ensurePromptFromProvider = (raw: unknown, fallback: string): string => {
+  if (!raw || typeof raw !== 'object') return fallback;
+  const prompt = String((raw as { prompt?: unknown }).prompt ?? '').trim();
+  return prompt || fallback;
 };
 
 export const extractSmallTags = async (input: string, provider: LLMProviderKind = 'openai') => {
@@ -87,6 +95,7 @@ export const optimizePrompt = async (
   const iterations: OptimizationIteration[] = [];
   let bestPrompt = inputPrompt.trim();
   let bestScore = scorePrompt(bestPrompt, target, evalHistory, options.rubric);
+  let latestTraceId = '';
 
   for (let i = 0; i < maxIterations; i += 1) {
     const llmRun = await gateway.generate('optimize', {
@@ -97,7 +106,8 @@ export const optimizePrompt = async (
     }, provider);
 
     llmRuns.push(llmRun);
-    const candidatePrompt = String((llmRun.primary.json as any)?.prompt ?? llmRun.primary.output ?? bestPrompt).trim();
+    latestTraceId = llmRun.traceId;
+    const candidatePrompt = ensurePromptFromProvider(llmRun.primary.json, llmRun.primary.output || bestPrompt).trim();
     const candidateScore = scorePrompt(candidatePrompt, target, evalHistory, options.rubric);
 
     if (candidateScore > bestScore) {
@@ -109,6 +119,32 @@ export const optimizePrompt = async (
       break;
     }
   }
+
+  for (const run of evalHistory) {
+    await persistEvalRun(run, {
+      runId,
+      dataset: 'default',
+      provider: options.provider ?? 'openai',
+      prompt: maskSensitiveText(bestPrompt),
+      traceId: latestTraceId || `trace-${run.evalId}`,
+      tabId: options.tabId,
+      sessionId: options.sessionId,
+    }).catch(() => undefined);
+  }
+
+  await logAuditEvent({
+    eventType: 'eval_result',
+    tabId: options.tabId,
+    sessionId: options.sessionId,
+    traceId: latestTraceId,
+    provider: options.provider ?? 'openai',
+    payload: {
+      runId,
+      evalRuns: evalHistory.length,
+      score: bestScore,
+    },
+    createdAt: Date.now(),
+  });
 
   return {
     optimization: {

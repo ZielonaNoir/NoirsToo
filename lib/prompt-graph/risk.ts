@@ -46,7 +46,19 @@ export const assessDomainRisk = (url: string): RiskCheckResult => {
   }
 
   const host = new URL(url).hostname;
-  if (/bank|wallet|payment|auth|secure/i.test(host)) {
+  const blockedHints = ['bank', 'wallet', 'payment', 'auth', 'secure', 'passport', 'identity'];
+  const hardBlocked = blockedHints.some((hint) => host.includes(hint));
+
+  if (hardBlocked) {
+    return {
+      blocked: false,
+      reason: 'Sensitive domain detected; explicit confirmation required before force inject.',
+      confidence: 0.82,
+      riskFlags: ['sensitive_domain', 'confirm_before_force'],
+    };
+  }
+
+  if (/finance|checkout|billing|login|account/i.test(host)) {
     return {
       blocked: false,
       reason: 'Sensitive domain detected; confirmation recommended.',

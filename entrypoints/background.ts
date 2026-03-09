@@ -1,4 +1,5 @@
 import { PromptOrchestrator, buildPromptAtoms, extractSmallTags, optimizePrompt } from '../lib/prompt-graph/engine';
+import { logAuditEvent, maskSensitiveText } from '../lib/prompt-graph/telemetry';
 import type {
   EvalRubric,
   GraphSnapshot,
@@ -80,6 +81,41 @@ const broadcastPanelEvent = async (tabId: number, event: string, payload?: unkno
   });
 };
 
+const auditRuntimeEvent = async (
+  tabId: number,
+  event: string,
+  session: PickSession | undefined,
+  payload?: unknown,
+  traceId?: string,
+) => {
+  const eventMap: Record<string, 'pick_start' | 'pick_select' | 'inject_request' | 'inject_result' | 'llm_request' | 'llm_result' | 'eval_result' | 'risk_blocked' | 'error'> = {
+    PICK_START: 'pick_start',
+    PICK_SELECT: 'pick_select',
+    INJECT_REQUEST: 'inject_request',
+    INJECT_RESULT: 'inject_result',
+    LLM_REQUEST: 'llm_request',
+    LLM_RESULT: 'llm_result',
+    EVAL_RESULT: 'eval_result',
+    RISK_BLOCKED: 'risk_blocked',
+    ERROR: 'error',
+  };
+
+  const mapped = eventMap[event];
+  if (!mapped) return;
+  const payloadRecord = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : undefined;
+  await logAuditEvent({
+    eventType: mapped,
+    tabId,
+    sessionId: session?.sessionId,
+    traceId,
+    state: session?.state,
+    payload: payloadRecord,
+    riskFlags: Array.isArray(payloadRecord?.riskFlags) ? (payloadRecord.riskFlags as string[]) : undefined,
+    createdAt: Date.now(),
+  });
+  await broadcastPanelEvent(tabId, 'AUDIT_LOGGED', { event }, traceId);
+};
+
 const sendToTab = async (tabId: number, message: Record<string, unknown>) => {
   await browser.tabs.sendMessage(tabId, message).catch((error) => {
     updateSession(tabId, { state: 'error', lastError: String(error) });
@@ -149,6 +185,7 @@ export default defineBackground(() => {
 
       log(eventMessage.event, tabId, eventMessage.sessionId ?? sessions[tabId]?.sessionId, sessions[tabId]?.state, eventMessage.payload);
       void broadcastPanelEvent(tabId, eventMessage.event, eventMessage.payload, eventMessage.traceId);
+      void auditRuntimeEvent(tabId, eventMessage.event, sessions[tabId], eventMessage.payload, eventMessage.traceId);
       return undefined;
     }
 
@@ -198,7 +235,18 @@ export default defineBackground(() => {
       const text = typeof message.input === 'string' ? message.input : '';
       const provider = (message.provider as LLMProviderKind) || 'openai';
       return extractSmallTags(text, provider).then(({ tags, run }) => {
-        void broadcastPanelEvent(Number(message.tabId ?? 0), 'LLM_RESULT', { taskType: 'extract', provider: run.primary.provider }, run.traceId);
+        void broadcastPanelEvent(Number(message.tabId ?? 0), 'LLM_RESULT', {
+          taskType: 'extract',
+          provider: run.primary.provider,
+          latencyMs: run.primary.latencyMs,
+          fallbackUsed: Boolean(run.fallback),
+        }, run.traceId);
+        void auditRuntimeEvent(Number(message.tabId ?? 0), 'LLM_RESULT', sessions[Number(message.tabId ?? 0)], {
+          taskType: 'extract',
+          provider: run.primary.provider,
+          latencyMs: run.primary.latencyMs,
+          costUsd: run.primary.costUsd,
+        }, run.traceId);
         return { ok: true, smallTags: tags, llmRun: run };
       });
     }
@@ -212,14 +260,31 @@ export default defineBackground(() => {
       const tabId = Number(message.tabId ?? 0);
 
       void broadcastPanelEvent(tabId, 'LLM_REQUEST', { taskType: 'optimize', provider });
+      void auditRuntimeEvent(tabId, 'LLM_REQUEST', sessions[tabId], { taskType: 'optimize', provider });
       return optimizePrompt(prompt, target, {
         provider,
         maxIterations: Number.isNaN(maxIterations) ? 3 : maxIterations,
         rubric,
+        tabId,
+        sessionId: sessions[tabId]?.sessionId,
       }).then((result) => {
         void broadcastPanelEvent(tabId, 'EVAL_RESULT', {
           latestScore: result.optimization.score,
           evalRuns: result.evalHistory.length,
+        }, result.llmRuns[0]?.traceId);
+        const latestRun = result.llmRuns[result.llmRuns.length - 1];
+        if (latestRun) {
+          void broadcastPanelEvent(tabId, 'LLM_RESULT', {
+            taskType: 'optimize',
+            provider: latestRun.primary.provider,
+            latencyMs: latestRun.primary.latencyMs,
+            fallbackUsed: Boolean(latestRun.fallback),
+          }, latestRun.traceId);
+        }
+        void auditRuntimeEvent(tabId, 'EVAL_RESULT', sessions[tabId], {
+          latestScore: result.optimization.score,
+          evalRuns: result.evalHistory.length,
+          bestPrompt: maskSensitiveText(result.optimization.bestPrompt),
         }, result.llmRuns[0]?.traceId);
 
         return {
@@ -239,7 +304,25 @@ export default defineBackground(() => {
       const rubric = message.rubric as EvalRubric | undefined;
 
       void broadcastPanelEvent(tabId, 'LLM_REQUEST', { taskType: 'extract+optimize', provider });
-      return orchestrator.run(input, target, { provider, maxIterations: 4, rubric }).then((result) => ({ ok: true, result }));
+      void auditRuntimeEvent(tabId, 'LLM_REQUEST', sessions[tabId], { taskType: 'extract+optimize', provider });
+      return orchestrator.run(input, target, {
+        provider,
+        maxIterations: 4,
+        rubric,
+        tabId,
+        sessionId: sessions[tabId]?.sessionId,
+      }).then((result) => {
+        const latestRun = result.llmRuns[result.llmRuns.length - 1];
+        if (latestRun) {
+          void broadcastPanelEvent(tabId, 'LLM_RESULT', {
+            taskType: latestRun.taskType,
+            provider: latestRun.primary.provider,
+            latencyMs: latestRun.primary.latencyMs,
+            fallbackUsed: Boolean(latestRun.fallback),
+          }, latestRun.traceId);
+        }
+        return { ok: true, result };
+      });
     }
 
     if (message.type === 'PANEL_SAVE_GRAPH') {
