@@ -37,7 +37,7 @@
         <!-- 隐形页脚 -->
         <div class="flex justify-between items-center px-2 opacity-30 hover:opacity-80 transition-opacity duration-500 text-[10px] tracking-widest uppercase">
           <span>DragonFill v0.1</span>
-          <button class="hover:text-mood-active transition-colors">
+          <button class="hover:text-mood-active transition-colors" @click="onConfigClick">
             Config
           </button>
         </div>
@@ -64,6 +64,13 @@ const isValid = computed(() => inputData.value.length > 0);
 const handleAction = async () => {
   if (!isValid.value) return;
 
+  // #region agent log
+  const hasSendMessage = typeof (window as any).browser?.runtime?.sendMessage === 'function';
+  const payloadA = {sessionId:'bbfbad',hypothesisId:'A',location:'popup/App.vue:handleAction',message:'Initiate Fusion clicked',data:{inputLen:inputData.value.length,sendMessageCalled:false,hasRuntimeSendMessage:hasSendMessage},timestamp:Date.now()};
+  console.log('[debug-bbfbad]', payloadA);
+  fetch('http://127.0.0.1:7935/ingest/e6b84f40-6e4b-456c-b127-22dda23138dc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bbfbad'},body:JSON.stringify(payloadA)}).catch(()=>{});
+  // #endregion
+
   currentStatus.value = 'processing';
   
   // 模拟 AI 思考延迟
@@ -82,6 +89,14 @@ const handleAction = async () => {
     }, 3000);
   }, 2000);
 };
+
+// #region agent log
+const onConfigClick = () => {
+  const payloadB = {sessionId:'bbfbad',hypothesisId:'B',location:'popup/App.vue:Config',message:'Config clicked (no other handler)',data:{hasConfigRoute:false},timestamp:Date.now()};
+  console.log('[debug-bbfbad]', payloadB);
+  fetch('http://127.0.0.1:7935/ingest/e6b84f40-6e4b-456c-b127-22dda23138dc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bbfbad'},body:JSON.stringify(payloadB)}).catch(()=>{});
+};
+// #endregion
 </script>
 
 <style>

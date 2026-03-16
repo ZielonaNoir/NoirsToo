@@ -751,6 +751,13 @@ const pushTelemetry = (event: string, state: string) => {
 };
 
 const startPick = async () => {
+  // #region agent log
+  const isQa = new URLSearchParams(window.location.search).get('qa') === '1';
+  const extTabId = Number((window as any).browser?.devtools?.inspectedWindow?.tabId ?? 0);
+  const payloadPanel = {sessionId:'bbfbad',hypothesisId:'C',hypothesisId2:'D',location:'prompt-panel/App.vue:startPick',message:'Start Pick clicked',data:{inspectedTabId,extensionTabId:extTabId,isQaMode:isQa},timestamp:Date.now()};
+  console.log('[debug-bbfbad]', payloadPanel);
+  fetch('http://127.0.0.1:7935/ingest/e6b84f40-6e4b-456c-b127-22dda23138dc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bbfbad'},body:JSON.stringify(payloadPanel)}).catch(()=>{});
+  // #endregion
   await bridge.sendMessage({ type: 'PANEL_PICK_START', tabId: inspectedTabId });
 };
 
