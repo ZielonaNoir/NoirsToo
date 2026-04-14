@@ -233,7 +233,7 @@ export default defineBackground(() => {
       }).catch((error) => ({ ok: false, error: String(error) }));
     }
 
-    if (message.type === 'POPUP_GET_LAST_EDGE_TABS') {
+    if (message.type === 'POPUP_GET_LAST_EDGE_TABS' || message.type === 'PANEL_GET_EDGE_TAB_SUMMARY') {
       return browser.storage.local.get(EDGE_TAB_IMPORT_KEY).then((result) => ({
         ok: true,
         summary: (result[EDGE_TAB_IMPORT_KEY] as EdgeTabImportSummary | undefined) ?? null,

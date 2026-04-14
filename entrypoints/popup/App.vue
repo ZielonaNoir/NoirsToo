@@ -274,6 +274,9 @@ const refreshTabs = async () => {
 
 const onConfigClick = async () => {
   if (!runtime?.runtime?.getURL || !runtime?.tabs?.create) return;
+  if (!tabSummary.value && hasRuntime.value) {
+    await refreshTabs();
+  }
   await runtime.tabs.create({ url: runtime.runtime.getURL('/prompt-panel.html') });
 };
 

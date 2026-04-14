@@ -9,6 +9,7 @@ import type {
   EvalRun,
   EvalRubric,
 } from '../../types/prompt-graph';
+import type { EdgeTabImportSummary } from '../../types';
 import { Evaluator } from './evaluator';
 import { persistEvalRun } from './eval-store';
 import { LLMGateway } from './providers/gateway';
@@ -73,6 +74,73 @@ export const buildPromptAtoms = (tags: TagNode[]): PromptAtom[] => {
       tagRefs: [tag.id, ...tag.children],
       enabled: true,
     }));
+};
+
+export const buildBasePrompt = (atoms: PromptAtom[], leadLine = 'You are a prompt process engine.') => {
+  return [
+    leadLine,
+    ...atoms.map((atom) => `[${atom.layer}] ${atom.text}`),
+    'Return output in deterministic JSON with rationale.',
+  ].join('\n');
+};
+
+const average = (values: number[]) => values.length === 0
+  ? 0
+  : Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2));
+
+export const buildAutoMacroTags = (tags: TagNode[], summary?: EdgeTabImportSummary | null): TagNode[] => {
+  const smallTags = tags.filter((tag) => tag.level === 'small');
+  const groups: Array<{ label: string; type: TagNode['type']; children: string[] }> = [];
+
+  const pushGroup = (label: string, type: TagNode['type'], children: string[]) => {
+    const uniqueChildren = Array.from(new Set(children)).slice(0, 8);
+    if (uniqueChildren.length < 2) return;
+    groups.push({ label, type, children: uniqueChildren });
+  };
+
+  const entities = smallTags.filter((tag) => tag.type === 'entity').map((tag) => tag.id);
+  const intents = smallTags.filter((tag) => tag.type === 'intent').map((tag) => tag.id);
+  const constraints = smallTags.filter((tag) => tag.type === 'constraint' || tag.type === 'risk').map((tag) => tag.id);
+  const style = smallTags.filter((tag) => tag.type === 'style' || tag.type === 'tone').map((tag) => tag.id);
+
+  pushGroup('Source Context', 'entity', entities);
+  pushGroup('Workflow Goal', 'intent', intents);
+  pushGroup('Guardrails', 'constraint', constraints);
+  pushGroup('Output Style', 'style', style);
+
+  if (summary && smallTags.length >= 2) {
+    const topCategories = summary.categories.slice(0, 2).map((item: { category: string }) => item.category).join(' + ');
+    const topDomains = summary.domains.slice(0, 3).map((item: { domain: string }) => item.domain).join(', ');
+    pushGroup(
+      topCategories ? `Window Focus: ${topCategories}` : 'Window Focus',
+      'intent',
+      smallTags.slice(0, 4).map((tag) => tag.id),
+    );
+    pushGroup(
+      topDomains ? `Domains: ${topDomains}` : 'Top Domains',
+      'entity',
+      entities.length >= 2 ? entities : smallTags.slice(0, 4).map((tag) => tag.id),
+    );
+  }
+
+  return groups.map((group, index) => {
+    const childTags = group.children
+      .map((childId) => smallTags.find((tag) => tag.id === childId))
+      .filter((tag): tag is TagNode => Boolean(tag));
+
+    return {
+      id: `macro-auto-${index + 1}`,
+      level: 'macro',
+      label: group.label,
+      type: group.type,
+      weight: average(childTags.map((tag) => tag.weight)),
+      confidence: average(childTags.map((tag) => tag.confidence)),
+      enabled: true,
+      children: group.children,
+      x: 160 + (index % 3) * 220,
+      y: 70 + Math.floor(index / 3) * 80,
+    } as TagNode;
+  });
 };
 
 const scorePrompt = (candidate: string, target: string, history: EvalRun[], rubric?: EvalRubric) => {
@@ -165,11 +233,7 @@ export class PromptOrchestrator {
     const provider = options.provider ?? 'openai';
     const { tags, run } = await extractSmallTags(input, provider);
     const atoms = buildPromptAtoms(tags);
-    const basePrompt = [
-      'You are a prompt process engine.',
-      ...atoms.map((atom) => `[${atom.layer}] ${atom.text}`),
-      'Return output in deterministic JSON with rationale.',
-    ].join('\n');
+    const basePrompt = buildBasePrompt(atoms);
 
     const optimized = await optimizePrompt(basePrompt, target, options);
 

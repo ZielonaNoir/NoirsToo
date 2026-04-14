@@ -170,6 +170,71 @@
     <section class="grid">
       <article class="card">
         <h2>Unstructured Input</h2>
+        <div
+          v-if="importedEdgeSummary"
+          class="edge-context"
+        >
+          <div class="edge-context-header">
+            <div>
+              <h3>Imported Edge Context</h3>
+              <p class="muted">
+                {{ importedEdgeStatus }}
+              </p>
+            </div>
+            <div class="row">
+              <button @click="loadEdgeTabSummary(false)">
+                Reload Snapshot
+              </button>
+              <button @click="applyImportedDigest('replace')">
+                Use Digest
+              </button>
+              <button @click="applyImportedDigest('append')">
+                Append Digest
+              </button>
+              <button @click="extractImportedDigest">
+                Build + Optimize
+              </button>
+            </div>
+          </div>
+
+          <div class="chips">
+            <span class="chip">
+              {{ importedEdgeSummary.cleanedTabs }} cleaned
+            </span>
+            <span class="chip">
+              {{ importedEdgeSummary.duplicateTabs }} duplicates
+            </span>
+            <span
+              v-for="item in importedEdgeSummary.categories.slice(0, 4)"
+              :key="item.category"
+              class="chip"
+            >
+              {{ item.category }} · {{ item.count }}
+            </span>
+          </div>
+
+          <ul class="edge-context-list">
+            <li
+              v-for="tab in importedEdgeSummary.tabs.slice(0, 4)"
+              :key="tab.cleanUrl"
+            >
+              {{ tab.title }} · {{ tab.domain }} · {{ tab.category }}
+            </li>
+          </ul>
+          <p
+            v-if="importedGraphSummary"
+            class="ok edge-context-summary"
+          >
+            {{ importedGraphSummary }}
+          </p>
+        </div>
+        <p
+          v-else
+          class="muted edge-context-empty"
+        >
+          No imported Edge snapshot yet. Open the popup to sync current window tabs.
+        </p>
+
         <textarea
           v-model="rawInput"
           placeholder="Paste unstructured text to extract small tags"
@@ -366,7 +431,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { buildAutoMacroTags, buildBasePrompt } from '../../lib/prompt-graph/engine';
 import { runForceLayout } from '../../lib/prompt-graph/layout';
+import type { EdgeTabImportSummary } from '../../types';
 import type {
   EvalRubric,
   EvalRun,
@@ -437,6 +504,7 @@ const evalHistory = ref<EvalRun[]>([]);
 const requiredTerms = ref('');
 const bannedTerms = ref('');
 const requiredSections = ref('');
+const importedEdgeSummary = ref<EdgeTabImportSummary | null>(null);
 
 const undoStack = ref<Array<{ smallTags: TagNode[]; macroTags: TagNode[] }>>([]);
 const redoStack = ref<Array<{ smallTags: TagNode[]; macroTags: TagNode[] }>>([]);
@@ -444,12 +512,24 @@ const redoStack = ref<Array<{ smallTags: TagNode[]; macroTags: TagNode[] }>>([])
 const selectedSmallTagIds = computed(() => smallTags.value.filter((tag) => tag.enabled).map((tag) => tag.id));
 const canInject = computed(() => inspectedTabId > 0 && !!session.targetNode && (session.state === 'selected' || session.state === 'done'));
 const selectionHistory = computed(() => session.selectionHistory ?? []);
+const hasGraphContent = computed(() => smallTags.value.length > 0 || macroTags.value.length > 0 || basePrompt.value.trim().length > 0);
 
 const filteredTags = computed(() => {
   const all = [...smallTags.value, ...macroTags.value];
   if (!tagSearch.value.trim()) return all;
   const query = tagSearch.value.toLowerCase();
   return all.filter((tag) => tag.label.toLowerCase().includes(query));
+});
+
+const importedEdgeStatus = computed(() => {
+  if (!importedEdgeSummary.value) return 'No imported snapshot available.';
+  return `${importedEdgeSummary.value.cleanedTabs} cleaned tabs across ${importedEdgeSummary.value.domains.length} domains`;
+});
+
+const importedGraphSummary = computed(() => {
+  if (!importedEdgeSummary.value || smallTags.value.length === 0 || promptAtoms.value.length === 0) return '';
+  const optimized = optimizationRun.value ? ` Optimized score ${optimizationRun.value.score.toFixed(3)}.` : '';
+  return `Built ${smallTags.value.length} tags, ${macroTags.value.length} macros, ${promptAtoms.value.length} atoms, and a base prompt from the imported digest.${optimized}`;
 });
 
 const createQaBridge = (): RuntimeBridge => {
@@ -731,11 +811,7 @@ const rebuildAtoms = () => {
     };
   });
 
-  basePrompt.value = [
-    'You are a prompt process engine.',
-    ...promptAtoms.value.map((atom) => `[${atom.layer}] ${atom.text}`),
-    'Return output in deterministic JSON with rationale.',
-  ].join('\n');
+  basePrompt.value = buildBasePrompt(promptAtoms.value);
 };
 
 watch([smallTags, macroTags], rebuildAtoms, { deep: true });
@@ -853,15 +929,7 @@ const inject = async (mode: 'empty-only' | 'force') => {
   await bridge.sendMessage({ type: 'PANEL_INJECT', tabId: inspectedTabId, mode });
 };
 
-const extractTags = async () => {
-  snapshotState();
-  const response = await bridge.sendMessage({
-    type: 'PANEL_EXTRACT_TAGS',
-    tabId: inspectedTabId,
-    input: rawInput.value,
-    provider: provider.value,
-  });
-
+const populateFromExtractResponse = (response: { ok?: boolean; smallTags?: TagNode[] } | undefined) => {
   if (!response?.ok) return;
   smallTags.value = (response.smallTags || []).map((tag: TagNode, index: number) => ({
     ...tag,
@@ -869,7 +937,129 @@ const extractTags = async () => {
     y: tag.y ?? 80 + Math.floor(index / 8) * 90,
   }));
   macroTags.value = [];
+  optimizationRun.value = null;
+  evalHistory.value = [];
   rebuildAtoms();
+};
+
+const buildGraphFromInput = async (
+  input: string,
+  options: {
+    snapshot?: boolean;
+    replaceInput?: boolean;
+  } = {},
+) => {
+  const trimmed = input.trim();
+  if (!trimmed) return;
+
+  if (options.snapshot !== false) {
+    snapshotState();
+  }
+
+  if (options.replaceInput !== false) {
+    rawInput.value = trimmed;
+  }
+
+  const response = await bridge.sendMessage({
+    type: 'PANEL_EXTRACT_TAGS',
+    tabId: inspectedTabId,
+    input: trimmed,
+    provider: provider.value,
+  });
+
+  populateFromExtractResponse(response);
+};
+
+const extractTags = async () => {
+  await buildGraphFromInput(rawInput.value, {
+    snapshot: true,
+    replaceInput: false,
+  });
+};
+
+const loadEdgeTabSummary = async (prefill = true) => {
+  const response = await bridge.sendMessage({ type: 'PANEL_GET_EDGE_TAB_SUMMARY' });
+  if (!response?.ok) return;
+
+  const summary = (response.summary as EdgeTabImportSummary | null | undefined) ?? null;
+  importedEdgeSummary.value = summary;
+
+  if (prefill && !rawInput.value.trim() && summary?.digest) {
+    rawInput.value = summary.digest;
+  }
+};
+
+const buildImportedTarget = (summary: EdgeTabImportSummary) => {
+  const categoryLine = summary.categories.length > 0
+    ? summary.categories.slice(0, 4).map((item) => `${item.category}(${item.count})`).join(', ')
+    : 'none';
+  const domainLine = summary.domains.length > 0
+    ? summary.domains.slice(0, 4).map((item) => `${item.domain}(${item.count})`).join(', ')
+    : 'none';
+
+  return [
+    'Produce a reusable prompt brief for transforming imported browser research into structured output.',
+    'The prompt must preserve browsing context, research intent, and actionable constraints.',
+    `Category coverage: ${categoryLine}.`,
+    `Domain coverage: ${domainLine}.`,
+    'The final output should include Context, Task, Constraints, Style, and Output Schema sections.',
+    'Keep the result concise, deterministic, and suitable for downstream LLM execution.',
+  ].join('\n');
+};
+
+const applyAutoMacroTags = (summary?: EdgeTabImportSummary | null) => {
+  const autoMacros = buildAutoMacroTags(smallTags.value, summary);
+  macroTags.value = autoMacros;
+  rebuildAtoms();
+};
+
+const applyImportedDigest = (mode: 'replace' | 'append') => {
+  const digest = importedEdgeSummary.value?.digest?.trim();
+  if (!digest) return;
+
+  if (mode === 'append' && rawInput.value.trim()) {
+    rawInput.value = `${rawInput.value.trim()}\n\n${digest}`;
+    return;
+  }
+
+  rawInput.value = digest;
+};
+
+const optimizeCurrentPrompt = async (targetOverride?: string) => {
+  const target = targetOverride?.trim() || targetOutput.value.trim();
+  if (!basePrompt.value.trim() || !target) return;
+
+  if (targetOverride?.trim()) {
+    targetOutput.value = targetOverride.trim();
+  }
+
+  const response = await bridge.sendMessage({
+    type: 'PANEL_OPTIMIZE_PROMPT',
+    tabId: inspectedTabId,
+    provider: provider.value,
+    prompt: basePrompt.value,
+    target,
+    maxIterations: 4,
+    rubric: evalRubric.value,
+  });
+
+  if (!response?.ok) return;
+  optimizationRun.value = response.run;
+  basePrompt.value = response.run.bestPrompt;
+  evalHistory.value = response.evalHistory || [];
+};
+
+const extractImportedDigest = async () => {
+  if (!importedEdgeSummary.value?.digest) return;
+  await buildGraphFromInput(importedEdgeSummary.value.digest, {
+    snapshot: true,
+    replaceInput: true,
+  });
+  applyAutoMacroTags(importedEdgeSummary.value);
+  if (!targetOutput.value.trim()) {
+    targetOutput.value = buildImportedTarget(importedEdgeSummary.value);
+  }
+  await optimizeCurrentPrompt(targetOutput.value);
 };
 
 const runOrchestrate = async () => {
@@ -917,20 +1107,7 @@ const createMacroTag = () => {
 };
 
 const runOptimize = async () => {
-  const response = await bridge.sendMessage({
-    type: 'PANEL_OPTIMIZE_PROMPT',
-    tabId: inspectedTabId,
-    provider: provider.value,
-    prompt: basePrompt.value,
-    target: targetOutput.value,
-    maxIterations: 4,
-    rubric: evalRubric.value,
-  });
-
-  if (!response?.ok) return;
-  optimizationRun.value = response.run;
-  basePrompt.value = response.run.bestPrompt;
-  evalHistory.value = response.evalHistory || [];
+  await optimizeCurrentPrompt();
 };
 
 const saveGraph = async () => {
@@ -1073,6 +1250,19 @@ onMounted(async () => {
   const historyResponse = await bridge.sendMessage({ type: 'PANEL_GET_SELECTION_HISTORY', tabId: inspectedTabId });
   if (historyResponse?.ok && Array.isArray(historyResponse.history)) {
     session.selectionHistory = historyResponse.history;
+  }
+
+  await loadEdgeTabSummary();
+  if (importedEdgeSummary.value?.digest && !hasGraphContent.value) {
+    await buildGraphFromInput(importedEdgeSummary.value.digest, {
+      snapshot: false,
+      replaceInput: true,
+    });
+    applyAutoMacroTags(importedEdgeSummary.value);
+    if (!targetOutput.value.trim()) {
+      targetOutput.value = buildImportedTarget(importedEdgeSummary.value);
+    }
+    await optimizeCurrentPrompt(targetOutput.value);
   }
 
   bridge.removeListener(panelEventListener);
