@@ -1,6 +1,11 @@
 import { PromptOrchestrator, buildPromptAtoms, extractSmallTags, optimizePrompt } from '../lib/prompt-graph/engine';
 import { logAuditEvent, maskSensitiveText } from '../lib/prompt-graph/telemetry';
 import type {
+  BrowserTabCandidate,
+  EdgeTabImportSummary,
+} from '../types';
+import { buildEdgeTabImportSummary } from '../lib/edge-tab-intel';
+import type {
   EvalRubric,
   GraphSnapshot,
   PickSession,
@@ -18,6 +23,7 @@ interface SessionStore {
 
 const sessions: SessionStore = {};
 const GRAPH_SNAPSHOT_VERSION = 2;
+const EDGE_TAB_IMPORT_KEY = 'edge-tabs:last-import';
 const orchestrator = new PromptOrchestrator();
 
 const log = (event: string, tabId: number, sessionId?: string, state?: PickSession['state'], payload?: unknown) => {
@@ -117,7 +123,17 @@ const auditRuntimeEvent = async (
 };
 
 const sendToTab = async (tabId: number, message: Record<string, unknown>) => {
+  // #region agent log
+  const payloadC1 = {sessionId:'bbfbad',hypothesisId:'C',location:'background.ts:sendToTab',message:'sendToTab called',data:{tabId,messageType:(message as any)?.type},timestamp:Date.now()};
+  console.log('[debug-bbfbad]', payloadC1);
+  fetch('http://127.0.0.1:7935/ingest/e6b84f40-6e4b-456c-b127-22dda23138dc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bbfbad'},body:JSON.stringify(payloadC1)}).catch(()=>{});
+  // #endregion
   await browser.tabs.sendMessage(tabId, message).catch((error) => {
+    // #region agent log
+    const payloadC2 = {sessionId:'bbfbad',hypothesisId:'C',location:'background.ts:sendToTab:catch',message:'sendToTab failed',data:{tabId,error:String(error)},timestamp:Date.now()};
+    console.log('[debug-bbfbad]', payloadC2);
+    fetch('http://127.0.0.1:7935/ingest/e6b84f40-6e4b-456c-b127-22dda23138dc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bbfbad'},body:JSON.stringify(payloadC2)}).catch(()=>{});
+    // #endregion
     updateSession(tabId, { state: 'error', lastError: String(error) });
     log('TAB_MESSAGE_ERROR', tabId, sessions[tabId]?.sessionId, sessions[tabId]?.state, { message: String(error) });
   });
@@ -144,9 +160,14 @@ const requestInjection = async (tabId: number, mode: FillMode) => {
 
 export default defineBackground(() => {
   browser.commands.onCommand.addListener(async (command) => {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    // #region agent log
+    const payloadE = {sessionId:'bbfbad',hypothesisId:'E',location:'background.ts:onCommand',message:'Command received',data:{command,tabId:tab?.id ?? null},timestamp:Date.now()};
+    console.log('[debug-bbfbad]', payloadE);
+    fetch('http://127.0.0.1:7935/ingest/e6b84f40-6e4b-456c-b127-22dda23138dc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bbfbad'},body:JSON.stringify(payloadE)}).catch(()=>{});
+    // #endregion
     if (command !== 'toggle-picker') return;
 
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) return;
 
     const session = createSession(tab.id);
@@ -195,8 +216,37 @@ export default defineBackground(() => {
       return Promise.resolve({ ok: true, session: createSession(tabId) });
     }
 
+    if (message.type === 'POPUP_IMPORT_EDGE_TABS') {
+      return browser.tabs.query({ currentWindow: true }).then(async (tabs) => {
+        const summary = buildEdgeTabImportSummary(tabs as BrowserTabCandidate[]);
+        await browser.storage.local.set({ [EDGE_TAB_IMPORT_KEY]: summary });
+        await logAuditEvent({
+          eventType: 'tabs_import',
+          payload: {
+            totalTabs: summary.totalTabs,
+            cleanedTabs: summary.cleanedTabs,
+            duplicateTabs: summary.duplicateTabs,
+          },
+          createdAt: Date.now(),
+        });
+        return { ok: true, summary };
+      }).catch((error) => ({ ok: false, error: String(error) }));
+    }
+
+    if (message.type === 'POPUP_GET_LAST_EDGE_TABS') {
+      return browser.storage.local.get(EDGE_TAB_IMPORT_KEY).then((result) => ({
+        ok: true,
+        summary: (result[EDGE_TAB_IMPORT_KEY] as EdgeTabImportSummary | undefined) ?? null,
+      }));
+    }
+
     if (message.type === 'PANEL_PICK_START') {
       const tabId = Number(message.tabId ?? 0);
+      // #region agent log
+      const payloadCD = {sessionId:'bbfbad',hypothesisId:'C',hypothesisId2:'D',location:'background.ts:PANEL_PICK_START',message:'PANEL_PICK_START received',data:{tabId,invalidTabId:!tabId},timestamp:Date.now()};
+      console.log('[debug-bbfbad]', payloadCD);
+      fetch('http://127.0.0.1:7935/ingest/e6b84f40-6e4b-456c-b127-22dda23138dc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bbfbad'},body:JSON.stringify(payloadCD)}).catch(()=>{});
+      // #endregion
       if (!tabId) return Promise.resolve({ ok: false, error: 'Invalid tabId' });
       return startPicking(tabId).then(() => ({ ok: true }));
     }

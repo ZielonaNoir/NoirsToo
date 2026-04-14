@@ -47,3 +47,60 @@ export interface BreathingConfig {
   minScale: number;        // Minimum scale factor
   maxScale: number;        // Maximum scale factor
 }
+
+export type ImportedTabCategory =
+  | 'ai'
+  | 'code'
+  | 'docs'
+  | 'research'
+  | 'productivity'
+  | 'communication'
+  | 'design'
+  | 'shopping'
+  | 'video'
+  | 'social'
+  | 'general';
+
+export interface BrowserTabCandidate {
+  id?: number;
+  index?: number;
+  windowId?: number;
+  title?: string;
+  url?: string;
+  active?: boolean;
+  pinned?: boolean;
+  audible?: boolean;
+  discarded?: boolean;
+  favIconUrl?: string;
+}
+
+export interface ImportedEdgeTab {
+  id: number;
+  index: number;
+  windowId: number;
+  title: string;
+  url: string;
+  cleanUrl: string;
+  domain: string;
+  path: string;
+  category: ImportedTabCategory;
+  keywords: string[];
+  active: boolean;
+  pinned: boolean;
+  audible: boolean;
+  duplicateCount: number;
+  summary: string;
+}
+
+export interface EdgeTabImportSummary {
+  importedAt: number;
+  sourceBrowser: 'edge';
+  totalTabs: number;
+  cleanedTabs: number;
+  duplicateTabs: number;
+  activeTabId?: number;
+  digest: string;
+  categories: Array<{ category: ImportedTabCategory; count: number }>;
+  domains: Array<{ domain: string; count: number }>;
+  tabs: ImportedEdgeTab[];
+}

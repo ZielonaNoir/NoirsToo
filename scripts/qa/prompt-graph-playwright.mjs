@@ -9,6 +9,7 @@ const PLAYWRIGHT_TMP_DIR = path.join(ROOT, '.playwright-cli');
 const RUN_ID = new Date().toISOString().replace(/[:.]/g, '-');
 const RUN_DIR = path.join(ROOT, 'docs', 'reports', 'playwright', `prompt-graph-qa-${RUN_ID}`);
 const SUMMARY_PATH = path.join(RUN_DIR, 'summary.md');
+const REUSE_STATIC = process.env.QA_REUSE_STATIC === '1';
 
 const NPX_CMD = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const bunCandidate = process.platform === 'win32' ? path.join(process.env.USERPROFILE ?? '', '.bun', 'bin', 'bun.exe') : 'bun';
@@ -16,7 +17,7 @@ const BUN_CMD = process.platform === 'win32' && fs.existsSync(bunCandidate) ? bu
 
 const results = [];
 let staticServer = null;
-let serverPort = 4173;
+let serverPort = Number(process.env.QA_PORT || '4173');
 
 fs.mkdirSync(RUN_DIR, { recursive: true });
 
@@ -53,6 +54,7 @@ const ensureBuild = () => {
 };
 
 const startStaticServer = async () => {
+  if (REUSE_STATIC && await isPortOpen(serverPort)) return;
   serverPort = await pickPort();
   staticServer = spawn('node', ['scripts/qa/static-server.mjs', '.output/chrome-mv3', String(serverPort)], {
     cwd: ROOT,
@@ -251,7 +253,9 @@ const runScenario = async () => {
 };
 
 const main = async () => {
-  ensureBuild();
+  if (!(REUSE_STATIC && await isPortOpen(serverPort))) {
+    ensureBuild();
+  }
   await startStaticServer();
   clearPlaywrightTmp();
   try { pwGlobal(['kill-all']); } catch { /* ignore */ }

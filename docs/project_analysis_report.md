@@ -46,7 +46,7 @@
 ### 3.2 Workflows 探针测试 (`.agent/workflows/`)
 
 - 按 `AGENTS.md` 所述，该目录用于存放可复用的 runbooks (如 `lint.md`, `data_gap_analysis.md`)。
-- **现状**：当前该目录也处于空闲状态，这意味着现阶段你可能会直接利用 npm / bun scripts (在 `package.json` 中的各报告脚本，如 `report:ops-scan`, `qa:buttons` 等) 来替代复杂的 CI 交互。
+- **现状**：当前该目录也处于空闲状态，这意味着现阶段你可能会直接利用 npm / bun scripts (在 `package.json` 中的各报告脚本，如 `report:ops-scan`, `qa:prompt-graph` 等) 来替代复杂的 CI 交互。
 
 ## 总结 (Summary)
 

@@ -2,17 +2,20 @@ import type { LLMProviderKind, LLMRun, LLMTaskPayload, LLMTaskType, ProviderResu
 import { GeminiAdapter } from './gemini';
 import { HeuristicAdapter } from './heuristic';
 import { OpenAIAdapter } from './openai';
+import { QwenAdapter } from './qwen';
 import type { LLMProvider } from './types';
 
 const providers: Record<LLMProviderKind, LLMProvider> = {
   openai: new OpenAIAdapter(),
   gemini: new GeminiAdapter(),
+  qwen: new QwenAdapter(),
   heuristic: new HeuristicAdapter(),
 };
 
 const fallbackOrder: Record<LLMProviderKind, LLMProviderKind[]> = {
-  openai: ['gemini', 'heuristic'],
-  gemini: ['openai', 'heuristic'],
+  openai: ['qwen', 'gemini', 'heuristic'],
+  gemini: ['qwen', 'openai', 'heuristic'],
+  qwen: ['openai', 'gemini', 'heuristic'],
   heuristic: [],
 };
 

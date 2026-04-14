@@ -116,7 +116,7 @@ export interface GraphSnapshot {
 
 export type LLMTaskType = 'extract' | 'merge' | 'atomize' | 'optimize';
 
-export type LLMProviderKind = 'openai' | 'gemini' | 'heuristic';
+export type LLMProviderKind = 'openai' | 'gemini' | 'heuristic' | 'qwen';
 
 export interface LLMTaskPayload {
   input: string;
@@ -205,6 +205,7 @@ export interface LLMBudgetSnapshot {
 }
 
 export type AuditEventType =
+  | 'tabs_import'
   | 'pick_start'
   | 'pick_select'
   | 'inject_request'

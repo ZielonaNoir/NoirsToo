@@ -24,16 +24,17 @@
     "report:dependency-drift": "node scripts/reports/dependency-drift.mjs",
     "report:release-gate": "node scripts/reports/release-gate.mjs",
     "report:all": "bun run report:standup && bun run report:weekly && bun run report:release-notes && bun run report:ops-scan && bun run report:ci-triage && bun run report:dependency-drift && bun run report:release-gate",
-    "qa:buttons": "node scripts/qa/buttons-playwright.mjs",
     "qa:prompt-graph": "node scripts/qa/prompt-graph-playwright.mjs",
     "check": "bun run compile && bun run lint && bun run test",
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.41",
     "@google/generative-ai": "^0.24.1",
     "@iconify/vue": "^5.0.0",
     "@stripe/stripe-js": "^8.9.0",
     "@supabase/supabase-js": "^2.98.0",
+    "ai": "^6.0.116",
     "gsap": "^3.14.2",
     "vue": "^3.5.29"
   },
