@@ -1,0 +1,17 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic:
+      - img
+  - generic [ref=e9]:
+    - generic [ref=e11]:
+      - img [ref=e16]
+      - generic [ref=e18]: Awaiting Input
+    - generic [ref=e23]:
+      - textbox "Drop raw fragments here..." [ref=e24]
+      - generic [ref=e25]: 0 CHARS
+    - generic [ref=e26]:
+      - button "Initiate Fusion" [disabled] [ref=e27]:
+        - generic [ref=e31]: Initiate Fusion
+      - generic [ref=e32]:
+        - generic [ref=e33]: DragonFill v0.1
+        - button "Config" [ref=e34] [cursor=pointer]

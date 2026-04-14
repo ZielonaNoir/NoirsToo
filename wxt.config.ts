@@ -8,10 +8,19 @@ export default defineConfig({
     description: '全局级 AI 智能表单填充引擎 | Bio-Digital Fusion Form Autofill',
     permissions: [
       'activeTab',
+      'tabs',
       'storage',
       'clipboardRead',
       'scripting'
     ],
+    commands: {
+      'toggle-picker': {
+        suggested_key: {
+          default: 'Ctrl+Shift+Z'
+        },
+        description: 'Toggle Prompt Graph picker mode on the active page'
+      }
+    },
     host_permissions: [
       '<all_urls>'
     ],

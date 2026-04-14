@@ -1,0 +1,89 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading "Prompt Graph" [level=1] [ref=e6]
+      - paragraph [ref=e7]:
+        - text: "Tab 999 · state:"
+        - strong [ref=e8]: done
+    - generic [ref=e9]:
+      - button "Start Pick" [ref=e10] [cursor=pointer]
+      - button "Stop" [disabled] [ref=e11]
+      - button "Inject Empty" [ref=e12] [cursor=pointer]
+      - button "Inject Force" [ref=e13] [cursor=pointer]
+  - generic [ref=e14]:
+    - heading "Picker Result" [level=2] [ref=e15]
+    - paragraph [ref=e66]: Injected 3/3, skipped 0, 0ms
+    - generic [ref=e16]:
+      - paragraph [ref=e17]:
+        - strong [ref=e18]: "Selector:"
+        - text: "#qa-target"
+      - paragraph [ref=e19]:
+        - strong [ref=e20]: "XPath:"
+        - text: /html/body/div[1]
+      - paragraph [ref=e21]:
+        - strong [ref=e22]: "Fields:"
+        - text: "3"
+      - list [ref=e23]:
+        - listitem [ref=e24]:
+          - generic [ref=e25]: Email
+          - code [ref=e26]: email
+        - listitem [ref=e27]:
+          - generic [ref=e28]: Name
+          - code [ref=e29]: text
+        - listitem [ref=e30]:
+          - generic [ref=e31]: City
+          - code [ref=e32]: text
+    - generic [ref=e33]:
+      - heading "QA Fixture Controls" [level=3] [ref=e34]
+      - button "Mock Select Target" [ref=e35] [cursor=pointer]
+      - generic [ref=e36]:
+        - generic [ref=e37]: Email
+        - textbox "email" [ref=e38]: chaos@example.com
+      - generic [ref=e39]:
+        - generic [ref=e40]: Name
+        - textbox "name" [ref=e41]: Dragon Operator
+      - generic [ref=e42]:
+        - generic [ref=e43]: City
+        - textbox "city" [ref=e44]: Neon Harbor
+  - generic [ref=e45]:
+    - article [ref=e46]:
+      - heading "Unstructured Input" [level=2] [ref=e47]
+      - textbox "Paste unstructured text to extract small tags" [ref=e48]: extract_camera_motion_cinematic_tone
+      - generic [ref=e49]:
+        - button "Extract Tags" [ref=e50] [cursor=pointer]
+        - button "Save" [ref=e51] [cursor=pointer]
+        - button "Load" [ref=e52] [cursor=pointer]
+    - article [ref=e53]:
+      - heading "Bubble Graph" [level=2] [ref=e54]
+      - paragraph [ref=e55]: Small tags
+      - generic [ref=e67]:
+        - generic [ref=e68]:
+          - checkbox "extract" [checked] [ref=e69]
+          - generic [ref=e70]: extract
+        - generic [ref=e71]:
+          - checkbox "camera" [checked] [ref=e72]
+          - generic [ref=e73]: camera
+        - generic [ref=e74]:
+          - checkbox "motion" [checked] [ref=e75]
+          - generic [ref=e76]: motion
+        - generic [ref=e77]:
+          - checkbox "cinematic" [checked] [ref=e78]
+          - generic [ref=e79]: cinematic
+        - generic [ref=e80]:
+          - checkbox "tone" [checked] [ref=e81]
+          - generic [ref=e82]: tone
+      - generic [ref=e56]:
+        - textbox "Macro tag name" [ref=e57]
+        - button "Fuse" [disabled] [ref=e58]
+      - paragraph [ref=e59]: Macro tags
+      - generic [ref=e95]:
+        - checkbox "Scene_Macro (5)" [checked] [ref=e96]
+        - generic [ref=e97]: Scene_Macro (5)
+  - generic [ref=e60]:
+    - heading "Prompt Atoms" [level=2] [ref=e61]
+    - generic [ref=e84]:
+      - text: task
+      - paragraph [ref=e85]: "Scene_Macro: extract, camera, motion, cinematic, tone"
+    - textbox "Base prompt generated from tags" [ref=e62]: "You are a prompt process engine. [task] Scene_Macro: extract, camera, motion, cinematic, tone Return output in a deterministic structure and include rationale for key decisions."
+    - textbox "Target output sample or rubric" [ref=e63]
+    - button "Optimize Prompt" [disabled] [ref=e65]

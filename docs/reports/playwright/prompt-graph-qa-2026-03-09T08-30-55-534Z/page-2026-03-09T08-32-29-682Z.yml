@@ -1,0 +1,122 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading "Prompt Graph" [level=1] [ref=e6]
+      - paragraph [ref=e7]:
+        - text: "Tab 999 · state:"
+        - strong [ref=e8]: done
+        - text: "· provider:"
+        - strong [ref=e9]: heuristic
+    - generic [ref=e10]:
+      - button "Start Pick" [ref=e11] [cursor=pointer]
+      - button "Stop" [disabled] [ref=e12]
+      - button "Inspect Sync Off" [disabled] [ref=e13]
+      - button "Import $0" [disabled] [ref=e14]
+  - generic [ref=e15]:
+    - heading "Provider" [level=2] [ref=e16]
+    - generic [ref=e17]:
+      - button "OpenAI" [ref=e18] [cursor=pointer]
+      - button "Gemini" [ref=e19] [cursor=pointer]
+      - button "Heuristic" [ref=e20] [cursor=pointer]
+    - paragraph [ref=e21]: OpenAI primary, Gemini fallback, heuristic final fallback.
+  - generic [ref=e22]:
+    - heading "Picker Result" [level=2] [ref=e23]
+    - paragraph [ref=e95]: Injected 3/3, skipped 0, 1ms
+    - generic [ref=e24]:
+      - paragraph [ref=e25]:
+        - strong [ref=e26]: "Selector:"
+        - text: "#qa-target"
+      - paragraph [ref=e27]:
+        - strong [ref=e28]: "XPath:"
+        - text: /html/body/div[1]
+      - paragraph [ref=e29]:
+        - strong [ref=e30]: "Fields:"
+        - text: "3"
+      - list [ref=e31]:
+        - listitem [ref=e32]:
+          - generic [ref=e33]: Email
+          - code [ref=e34]: email
+        - listitem [ref=e35]:
+          - generic [ref=e36]: Name
+          - code [ref=e37]: text
+        - listitem [ref=e38]:
+          - generic [ref=e39]: City
+          - code [ref=e40]: text
+    - generic [ref=e41]:
+      - button "Inject Empty" [ref=e42] [cursor=pointer]
+      - button "Inject Force" [ref=e43] [cursor=pointer]
+    - generic [ref=e44]:
+      - heading "Selection History" [level=3] [ref=e45]
+      - generic [ref=e46]:
+        - button "#qa-target" [ref=e47] [cursor=pointer]
+        - button "#qa-target" [ref=e94] [cursor=pointer]
+    - generic [ref=e48]:
+      - heading "QA Fixture Controls" [level=3] [ref=e49]
+      - button "Mock Select Target" [ref=e50] [cursor=pointer]
+      - generic [ref=e51]:
+        - generic [ref=e52]: Email
+        - textbox "email" [ref=e53]: chaos@example.com
+      - generic [ref=e54]:
+        - generic [ref=e55]: Name
+        - textbox "name" [ref=e56]: Dragon Operator
+      - generic [ref=e57]:
+        - generic [ref=e58]: City
+        - textbox "city" [ref=e59]: Neon Harbor
+  - generic [ref=e60]:
+    - article [ref=e61]:
+      - heading "Unstructured Input" [level=2] [ref=e62]
+      - textbox "Paste unstructured text to extract small tags" [ref=e63]: extract,camera,motion,cinematic,tone
+      - textbox "Target output sample or rubric" [ref=e64]: Need_concise_storyboard_output
+      - textbox "Required terms (comma separated)" [ref=e65]
+      - textbox "Banned terms (comma separated)" [ref=e66]
+      - textbox "Required sections (comma separated)" [ref=e67]
+      - generic [ref=e68]:
+        - button "Extract Tags" [ref=e69] [cursor=pointer]
+        - button "Full Orchestrate" [ref=e70] [cursor=pointer]
+        - button "Save" [ref=e71] [cursor=pointer]
+        - button "Load" [ref=e72] [cursor=pointer]
+    - article [ref=e73]:
+      - heading "Bubble Graph" [level=2] [ref=e74]
+      - generic [ref=e75]:
+        - textbox "Filter tags" [ref=e76]
+        - button "Auto Layout" [ref=e77] [cursor=pointer]
+        - button "Undo" [ref=e78] [cursor=pointer]
+        - button "Redo" [disabled] [ref=e79]
+      - generic [ref=e80]:
+        - button "extract" [ref=e98] [cursor=pointer]
+        - button "camera" [ref=e99] [cursor=pointer]
+        - button "motion" [ref=e100] [cursor=pointer]
+        - button "cinematic" [ref=e101] [cursor=pointer]
+        - button "tone" [ref=e102] [cursor=pointer]
+        - button "Scene_Macro" [ref=e114] [cursor=pointer]
+      - generic [ref=e81]:
+        - textbox "Macro tag name" [ref=e82]
+        - button "Fuse" [disabled] [ref=e83]
+      - paragraph [ref=e84]: Macro tags
+      - generic [ref=e116]:
+        - checkbox "Scene_Macro (5)" [checked] [ref=e117]
+        - generic [ref=e118]: Scene_Macro (5)
+  - generic [ref=e85]:
+    - heading "Prompt Atoms" [level=2] [ref=e86]
+    - generic [ref=e104]:
+      - text: task
+      - paragraph [ref=e105]: "Scene_Macro: extract, camera, motion, cinematic, tone"
+    - textbox "Base prompt generated from tags" [ref=e87]: "Initial_prompt Target alignment: Need_concise_storyboard_output"
+    - button "Optimize Prompt" [active] [ref=e89] [cursor=pointer]
+    - generic [ref=e119]:
+      - paragraph [ref=e120]:
+        - strong [ref=e121]: "Best score:"
+        - text: "0.720"
+      - paragraph [ref=e122]:
+        - strong [ref=e123]: "Best prompt:"
+      - generic [ref=e124]: "Initial_prompt Target alignment: Need_concise_storyboard_output"
+    - generic [ref=e125]:
+      - heading "Eval History" [level=3] [ref=e126]
+      - list [ref=e127]:
+        - listitem [ref=e128]: score=0.720 · semantic=0.730 · structure=0.700 · constraints=0.720
+  - generic [ref=e90]:
+    - heading "Telemetry" [level=2] [ref=e91]
+    - list [ref=e92]:
+      - listitem [ref=e97]: 2026-03-09T08:31:42.187Z · INJECT_RESULT · done
+      - listitem [ref=e96]: 2026-03-09T08:31:34.580Z · INJECT_RESULT · done
+      - listitem [ref=e93]: 2026-03-09T08:31:22.843Z · PICK_START · picking
